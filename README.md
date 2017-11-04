@@ -1,4 +1,5 @@
 # VMware Terraform provider for vRealize Automation 7
+[![Build Status](https://travis-ci.org/vmware/terraform-provider-vra7.svg?branch=master)](https://travis-ci.org/vmware/terraform-provider-vra7)
 
 A self-contained deployable integration between Terraform and vRealize Automation (vRA) which allows Terraform users to request/provision entitled vRA catalog items using Terraform. Supports Terraform destroying vRA provisioned resources.
 

@@ -39,6 +39,6 @@ race:
 release:
 	for os in darwin linux windows; do \
 	  mkdir -p pkg/$$os; \
-	  GOARCH=amd64 GOOS=$$os go build -o pkg/$$os/${NAME}_v${VERSION}; \
-	  (cd pkg/$$os; zip ../../${NAME}_${VERSION}_$${os}_amd64.zip ${NAME}_v${VERSION}); \
+	  GOARCH=amd64 GOOS=$$os go build -o pkg/$$os/${NAME}; \
+	  (cd pkg/$$os; zip ../../${NAME}_${VERSION}_$${os}_amd64.zip ${NAME}); \
 	done
