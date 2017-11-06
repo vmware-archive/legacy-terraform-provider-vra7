@@ -2,12 +2,12 @@ package vrealize
 
 import (
 	"fmt"
-	"github.com/dghubble/sling"
-	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -362,10 +362,8 @@ func (c *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceView
 	apiError := new(APIError)
 
 	//Set a REST call with delete resource request and delete resource template as a data
-	resp, err := sling.New().Set("Accept", "application/json").
-		Set("Content-Type", "application/json").Set("Authorization",
-		fmt.Sprintf("Bearer %s", c.BearerToken)).Post(destroyactionURL).BodyJSON(destroyTemplate).
-		Receive(actionResponse, apiError)
+	resp, err := c.HTTPClient.New().Post(destroyactionURL).
+		BodyJSON(destroyTemplate).Receive(actionResponse, apiError)
 
 	if resp.StatusCode != 201 {
 		return nil, err
@@ -392,10 +390,8 @@ func (c *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceVi
 	apiError := new(APIError)
 
 	//Set a rest call to power-off the resource with resource power-off template as a data
-	response, err := sling.New().Set("Accept", "application/json").
-		Set("Content-Type", "application/json").Set("Authorization",
-		fmt.Sprintf("Bearer %s", c.BearerToken)).Post(powerOffMachineactionURL).BodyJSON(powerOffTemplate).
-		Receive(actionResponse, apiError)
+	response, err := c.HTTPClient.New().Post(powerOffMachineactionURL).
+		BodyJSON(powerOffTemplate).Receive(actionResponse, apiError)
 
 	response.Close = true
 	if response.StatusCode == 201 {

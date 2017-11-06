@@ -1,10 +1,13 @@
 package vrealize
 
 import (
+	"crypto/tls"
 	"fmt"
-	"github.com/dghubble/sling"
 	"log"
+	"net/http"
 	"time"
+
+	"github.com/dghubble/sling"
 )
 
 //APIClient - This struct is used to store information provided in .tf file under provider block
@@ -15,6 +18,7 @@ type APIClient struct {
 	Password    string
 	BaseURL     string
 	Tenant      string
+	Insecure    bool
 	BearerToken string
 	HTTPClient  *sling.Sling
 }
@@ -40,12 +44,19 @@ type ActionResponseTemplate struct {
 
 //NewClient - set provider authentication details in struct
 //which will be used for all REST call authentication
-func NewClient(username string, password string, tenant string, baseURL string) APIClient {
+func NewClient(username string, password string, tenant string, baseURL string, insecure bool) APIClient {
+	// This overrides the DefaultTransport which is probably ok
+	// since we're generally only using a single client.
+	transport := http.DefaultTransport.(*http.Transport)
+	transport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: insecure,
+	}
 	return APIClient{
 		Username: username,
 		Password: password,
 		Tenant:   tenant,
 		BaseURL:  baseURL,
+		Insecure: insecure,
 		HTTPClient: sling.New().Base(baseURL).
 			Set("Accept", "application/json").
 			Set("Content-Type", "application/json"),

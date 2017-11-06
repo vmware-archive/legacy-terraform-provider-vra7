@@ -2,7 +2,6 @@ package vrealize
 
 import (
 	"fmt"
-	"github.com/dghubble/sling"
 )
 
 //ActionTemplate - is used to store action template
@@ -32,10 +31,9 @@ func (c *APIClient) GetActionTemplate(resourceViewsTemplate *ResourceViewsTempla
 
 	actionTemplate := new(ActionTemplate)
 	apiError := new(APIError)
+
 	//Set a REST call to perform an action on resource
-	_, err := sling.New().Set("Accept", "application/json").
-		Set("Content-Type", "application/json").Set("Authorization",
-		fmt.Sprintf("Bearer %s", c.BearerToken)).Get(actionURL).Receive(actionTemplate, apiError)
+	_, err := c.HTTPClient.New().Get(actionURL).Receive(actionTemplate, apiError)
 
 	if err != nil {
 		return nil, resourceViewsTemplate, err
