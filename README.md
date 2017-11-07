@@ -61,7 +61,7 @@ set GOPATH=C:\TerraformPluginProject
 Create *~/.terraformrc* and put following content in it.
 ```
     providers {
-         vrealize = "/home/<USER>/TerraformPluginProject/bin/terraform-provider-vra7"
+         vra7 = "/home/<USER>/TerraformPluginProject/bin/terraform-provider-vra7"
     }
 ```
 
@@ -70,7 +70,7 @@ Create *~/.terraformrc* and put following content in it.
 Create *%APPDATA%/terraform.rc* and put following content in it.
 ```
     providers {
-         vrealize = "C:\TerraformPluginProject\bin\terraform-provider-vra7"
+         vra7 = "C:\\TerraformPluginProject\\bin\\terraform-provider-vra7.exe"
     }
 ```
 
@@ -90,7 +90,7 @@ Navigate to */home/<USER>/TerraformPluginProject/src/github.com/vmware/terraform
 
 ```
     dep ensure
-    go build -o /home/<USER>/TerraformPluginProject/bin/terraform-provider-realize
+    go build -o /home/<USER>/TerraformPluginProject/bin/terraform-provider-vra7
 
 ```
 
@@ -100,7 +100,7 @@ Navigate to *C:\TerraformPluginProject\src\github.com\vmware\terraform-provider-
 
 ```
     dep ensure
-    go build -o C:\TerraformPluginProject\bin\terraform-provider-realize.exe
+    go build -o C:\TerraformPluginProject\bin\terraform-provider-vra7.exe
 
 ```
 
@@ -127,8 +127,8 @@ Example
     provider "vra7" {
       username = "vRAUser1"
       password = "password123!"
-      tenant = "corp.loca.tenant"
-      host = "http://myvra.endipoint.local/"
+      tenant = "corp.local.tenant"
+      host = "http://myvra.endpoint.local/"
     }
 
 ```
