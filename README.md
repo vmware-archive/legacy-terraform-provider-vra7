@@ -125,10 +125,10 @@ Example
 
 ```
     provider "vra7" {
-      username = "vRAUser1"
+      username = "vRAUser1@vsphere.local"
       password = "password123!"
       tenant = "corp.local.tenant"
-      host = "http://myvra.endpoint.local/"
+      host = "http://myvra.example.com/"
     }
 
 ```
@@ -156,7 +156,7 @@ Resource block contains two mandatory and three optional fields as follows
 
 * **resource_configuration** - *This is optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
 
-* **catalog_configuration** - *This is optional field. if catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
+* **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
 
 * **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
@@ -199,7 +199,8 @@ Save this configuration in main.tf in a path where the binary is placed.
 
 ## Execution
 
-There are three terraform commands that can be used on vRA plugin as follows.
+These are the terraform commands that can be used on vRA plugin as follows.
+* **terraform init** - *The init command is used to initialize a working directory containing Terraform configuration files.*
 
 * **terraform plan** - *Plan command shows plan for resources like how many resources will be provisioned and how many will be destroyed.*
 
