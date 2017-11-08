@@ -17,6 +17,7 @@ func init() {
 		"pass!@#",
 		"vsphere.local",
 		"http://localhost/",
+		true,
 	)
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -50,6 +51,7 @@ func TestNewClient(t *testing.T) {
 		password,
 		tenant,
 		baseURL,
+		true,
 	)
 
 	if client.Username != username {
