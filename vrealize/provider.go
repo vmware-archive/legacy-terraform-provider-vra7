@@ -41,6 +41,12 @@ func providerSchema() map[string]*schema.Schema {
 			Description: "host name.domain name of the vRealize Automation server, " +
 				"for example, mycompany.mktg.mydomain.com.",
 		},
+		"insecure": {
+			Type:        schema.TypeBool,
+			Default:     false,
+			Optional:    true,
+			Description: "Specify whether to validate TLS certificates.",
+		},
 	}
 }
 
@@ -50,7 +56,9 @@ func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	client := NewClient(r.Get("username").(string),
 		r.Get("password").(string),
 		r.Get("tenant").(string),
-		r.Get("host").(string))
+		r.Get("host").(string),
+		r.Get("insecure").(bool),
+	)
 
 	//Authenticate user
 	err := client.Authenticate()
