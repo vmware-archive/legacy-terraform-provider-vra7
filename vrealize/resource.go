@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -273,9 +272,9 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Set request status
 	d.Set("request_status", "SUBMITTED")
 
-
 	waitTimeout := d.Get("wait_timeout").(int)*60
-	for i :=0; i <= waitTimeout/30; i++ {
+
+	for i :=0; i < waitTimeout/30; i++ {
 		time.Sleep(3e+10)
 		readResource(d, meta)
 
@@ -283,10 +282,18 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			return nil
 		}
 		if d.Get("request_status") == "FAILED" {
+			//If request is failed during the time then
+			//unset resource details from state.
 			d.SetId("")
 			return fmt.Errorf("instance got failed while creating." +
 				" kindly check detail for more information")
 		}
+	}
+	if d.Get("request_status") == "IN_PROGRESS" {
+		//If request is in_progress state during the time then
+		//keep resource details in state files and throw an error
+		//so that the child resource won't go for create call.
+		return fmt.Errorf("resource is still being created")
 	}
 
 	return nil
