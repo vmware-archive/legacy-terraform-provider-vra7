@@ -268,7 +268,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		case "reasons":
 			templateCatalogItem.Reasons = deploymentConfiguration[depField].(string)
 		default:
-			log.Printf("unknown option [%s] with value [%s] ignoring\n", field3, deploymentConfiguration[depField])
+			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, deploymentConfiguration[depField])
 		}
 	}
 	//Log print of template after values updated
