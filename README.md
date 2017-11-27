@@ -157,7 +157,7 @@ Resource block contains two mandatory and three optional fields as follows
 * **resource_configuration** - *This is optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
 
 * **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
-* **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.*
+* **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
 
 * **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
