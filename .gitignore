@@ -30,3 +30,4 @@ test.sh
 terraform-provider-vra.exe
 vendor/
 example/terraform.tfvars
+*.vscode
