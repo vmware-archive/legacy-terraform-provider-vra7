@@ -16,6 +16,7 @@ type ResourceViewsTemplate struct {
 	Content []struct {
 		ResourceID   string `json:"resourceId"`
 		RequestState string `json:"requestState"`
+		Name         string `json:"name"`
 		Links        []struct {
 			Href string `json:"href"`
 			Rel  string `json:"rel"`
@@ -68,6 +69,7 @@ type RequestMachineResponse struct {
 	RequestedItemDescription string                 `json:"requestedItemDescription"`
 	Components               string                 `json:"components"`
 	StateName                string                 `json:"stateName"`
+	Name                     string                 `json:"name"`
 
 	CatalogItemProviderBinding struct {
 		BindingID   string `json:"bindingId"`
@@ -107,6 +109,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Optional: true,
 		},
 		"catalog_id": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		"name": {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
@@ -299,6 +306,16 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
+	}
+	//If request is successful then set the machine name
+	if resourceTemplate.Phase == "SUCCESSFUL" {
+		//Get resource view
+		resourceView, errTemplate := client.GetResourceViews(requestMachineID)
+		//Raise an exception if error occured while fetching resourceview
+		if errTemplate != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+		}
+		d.Set("name", resourceView.Content[1].Name)
 	}
 	return nil
 }
