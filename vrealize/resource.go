@@ -272,7 +272,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
 
-	d.Set("name", requestMachine.Name)
 	//Set request ID
 	d.SetId(requestMachine.ID)
 	//Set request status
@@ -307,6 +306,16 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
+	}
+	//If request is successful then set the machine name
+	if resourceTemplate.Phase == "SUCCESSFUL" {
+		//Get resource view
+		resourceView, errTemplate := client.GetResourceViews(requestMachineID)
+		//Raise an exception if error occured while fetching resourceview
+		if errTemplate != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+		}
+		d.Set("name", resourceView.Content[0].Name)
 	}
 	return nil
 }
