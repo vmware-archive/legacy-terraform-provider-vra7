@@ -1,9 +1,10 @@
 package main
 
 import (
+	"./vrealize"
+
 	"github.com/hashicorp/terraform/plugin"
 	"github.com/hashicorp/terraform/terraform"
-	"github.com/vmware/terraform-provider-vra7/vrealize"
 )
 
 func main() {
