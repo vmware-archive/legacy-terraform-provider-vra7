@@ -1,8 +1,7 @@
 package main
 
 import (
-	"./vrealize"
-
+	"github.com/AVENTER-UG/terraform-provider-vra7/vrealize"
 	"github.com/hashicorp/terraform/plugin"
 	"github.com/hashicorp/terraform/terraform"
 )
