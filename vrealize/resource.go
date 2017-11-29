@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -111,6 +110,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			Optional: true,
 		},
+		"wait_timeout": {
+			Type:     schema.TypeInt,
+			Optional: true,
+			Default: 15,
+		},
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -176,9 +180,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//If catalog name is provided then get catalog ID using name for further process
 	//else if catalog id is provided then fetch catalog name
-	log.Println("print before block")
 	if len(d.Get("catalog_name").(string)) > 0 {
-		log.Println("print in block")
 		catalogID, returnErr := client.readCatalogIDByName(d.Get("catalog_name").(string))
 		log.Printf("createResource->catalog_id %v\n", catalogID)
 		if returnErr != nil {
