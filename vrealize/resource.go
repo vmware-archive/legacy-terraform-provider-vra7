@@ -69,6 +69,7 @@ type RequestMachineResponse struct {
 	RequestedItemDescription string                 `json:"requestedItemDescription"`
 	Components               string                 `json:"components"`
 	StateName                string                 `json:"stateName"`
+	Name                     string                 `json:"name"`
 
 	CatalogItemProviderBinding struct {
 		BindingID   string `json:"bindingId"`
@@ -266,6 +267,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
 
+	d.Set("name", requestMachine.Name)
 	//Set request ID
 	d.SetId(requestMachine.ID)
 	//Set request status
