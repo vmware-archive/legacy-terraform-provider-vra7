@@ -10,7 +10,7 @@ These instructions will get you a copy of the project up and run on your local m
 ## Prerequisites
 
 To make plugin up and running you need following things.
-* [Terraform 9.8 or above](https://www.terraform.io/downloads.html)
+* [Terraform 0.9 or above](https://www.terraform.io/downloads.html)
 * [Go Language 1.9.2 or above](https://golang.org/dl/)
 * [dep - new dependency management tool for Go](https://github.com/golang/dep)
 
@@ -120,6 +120,7 @@ Provider block contains four mandatory fields
 * **password** - *vRA portal password*
 * **tenant** - *vRA portal tenant*
 * **host** - *End point of REST API*
+* **insecure** - *In case of self-signed certificates. Default value is false.*
 
 Example
 
@@ -129,6 +130,7 @@ Example
       password = "password123!"
       tenant = "corp.local.tenant"
       host = "http://myvra.example.com/"
+      insecure = false
     }
 
 ```
