@@ -315,7 +315,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		if errTemplate != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 		}
-		d.Set("name", resourceView.Content[0].Name)
+		d.Set("name", resourceView.Content[1].Name)
 	}
 	return nil
 }
