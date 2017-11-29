@@ -113,6 +113,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			Optional: true,
 		},
+		"name": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
