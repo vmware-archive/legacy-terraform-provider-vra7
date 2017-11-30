@@ -14,6 +14,7 @@ import (
 //related to resource template information.
 type ResourceViewsTemplate struct {
 	Content []struct {
+		ResourceType string `json:"resourceType"`
 		ResourceID   string `json:"resourceId"`
 		RequestState string `json:"requestState"`
 		Name         string `json:"name"`
@@ -315,7 +316,15 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		if errTemplate != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 		}
-		d.Set("name", resourceView.Content[1].Name)
+
+		// Iterate through the resourceView map
+		for _, i := range resourceView.Content {
+			// set the name only if its a virtual machine
+			if i.ResourceType == "Infrastucture.Virtual" {
+				d.Set("name", i.Name)
+			}
+		}
+
 	}
 	return nil
 }
