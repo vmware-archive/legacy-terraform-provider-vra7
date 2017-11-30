@@ -24,6 +24,7 @@ website/node_modules
 *.test
 *.iml
 *.diff
+.vscode/
 tmp
 terraform-provider-vra7*
 test.sh
