@@ -334,6 +334,10 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//Set a delete machine template function call.
 	//Which will fetch and return the delete machine template from the given template
 	DestroyMachineTemplate, resourceTemplate, errDestroyAction := client.GetDestroyActionTemplate(templateResources)
+	if errDestroyAction.Error() == "resource is not created or not found" {
+		d.SetId("")
+		return fmt.Errorf("possibly resource got deleted outside terraform")
+	}
 	if errDestroyAction != nil {
 		return fmt.Errorf("Destory Machine action template failed to load: %v", errDestroyAction)
 	}
