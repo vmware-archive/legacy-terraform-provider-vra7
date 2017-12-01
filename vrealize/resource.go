@@ -323,6 +323,8 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		}
 
 		// Iterate through the resourceView map
+		d.Set("resource_type", "")
+		d.Set("name", "")
 		for _, i := range resourceView.Content {
 			d.Set("resource_type", i.ResourceType)
 			// set the name only if its a virtual machine
