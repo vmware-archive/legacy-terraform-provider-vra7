@@ -328,7 +328,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		for _, i := range resourceView.Content {
 			d.Set("resource_type", i.ResourceType)
 			// set the name only if its a virtual machine
-			if i.ResourceType == "Infrastucture.Virtual" {
+			if i.ResourceType == "Infrastructure.Virtual" {
 				d.Set("name", i.Name)
 			}
 		}
