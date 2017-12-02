@@ -119,6 +119,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			Optional: true,
 		},
+		"resource_type": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -318,9 +323,12 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		}
 
 		// Iterate through the resourceView map
+		d.Set("resource_type", "")
+		d.Set("name", "")
 		for _, i := range resourceView.Content {
+			d.Set("resource_type", i.ResourceType)
 			// set the name only if its a virtual machine
-			if i.ResourceType == "Infrastucture.Virtual" {
+			if i.ResourceType == "Infrastructure.Virtual" {
 				d.Set("name", i.Name)
 			}
 		}
