@@ -205,8 +205,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	catalogConfiguration, _ := d.Get("catalog_configuration").(map[string]interface{})
 	for field1 := range catalogConfiguration {
-		templateCatalogItem.Data[field1] = catalogConfiguration[field1]
-
+		if templateCatalogItem.Data[field1] != nil {
+			templateCatalogItem.Data[field1] = catalogConfiguration[field1]
+		}else{
+			return fmt.Errorf(field1+" is not present in catalog configuration")
+		}
 	}
 	log.Printf("createResource->templateCatalogItem.Data %v\n", templateCatalogItem.Data)
 
