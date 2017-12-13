@@ -10,6 +10,7 @@ import (
 	"time"
 	"encoding/json"
 	"github.com/hashicorp/terraform/helper/schema"
+	"os"
 )
 
 //ResourceActionTemplate - is used to store information
@@ -499,7 +500,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	return nil
 }
-
 //Function use - To read configuration of centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func readResource(d *schema.ResourceData, meta interface{}) error {
