@@ -10,7 +10,6 @@ import (
 	"time"
 	"encoding/json"
 	"github.com/hashicorp/terraform/helper/schema"
-	"os"
 )
 
 //ResourceActionTemplate - is used to store information
