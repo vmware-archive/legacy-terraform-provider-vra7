@@ -6,22 +6,26 @@ import (
 	"reflect"
 	"strings"
 	"time"
-
 	"encoding/json"
-
 	"github.com/hashicorp/terraform/helper/schema"
+	"os"
 )
+
+//ResourceActionTemplate - is used to store information
+//related to resource action template information.
+type ResourceActionTemplate struct {
+	Type			string			`json:"type"`
+	ResourceID		string			`json:"resourceId"`
+	ActionID		string			`json:"actionId"`
+	Description		string			`json:"description"`
+	Data			map[string]interface{}	`json:"data"`
+}
+
 
 //ResourceViewsTemplate - is used to store information
 //related to resource template information.
 type ResourceViewsTemplate struct {
-	Content []struct {
-		ResourceID   string `json:"resourceId"`
-		RequestState string `json:"requestState"`
-		Links        []struct {
-			Href string `json:"href"`
-			Rel  string `json:"rel"`
-		} `json:"links"`
+	Content []interface {
 	} `json:"content"`
 	Links []interface{} `json:"links"`
 }
@@ -387,10 +391,107 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 //Function use - to update centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func updateResource(d *schema.ResourceData, meta interface{}) error {
-	log.Println(d)
+	//Get requester machine ID from schema.dataresource
+	requestMachineID := d.Id()
+	//Get client handle
+	client := meta.(*APIClient)
+
+	//If any change made in resource_configuration.
+	if d.HasChange("resource_configuration") {
+		//Read resource template
+		templateResources, errTemplate := client.GetResourceViews(requestMachineID)
+		if errTemplate != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+		}
+		//Set URL relation variables.
+		reconfigGetLinkTitle := "GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
+			"machine.Reconfigure}"
+		reconfigPostLinkTitle := "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
+			"machine.Reconfigure}"
+
+		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+
+		//Iterate over the template content elements
+		for item := range templateResources.Content {
+			mapData := templateResources.Content[item].(map[string]interface{})
+			childData := mapData["data"].(map[string]interface{})
+			childLinks := mapData["links"].([]interface{})
+			//If component is not empty
+			if childData["Component"] != nil {
+				componentName := childData["Component"].(string)
+				log.Println("componentName >> ", componentName)
+				var reconfigGetLink string
+				var reconfigPostLink string
+				//Iterate over the links present in content elements
+				for link := range childLinks {
+					linkInterface := childLinks[link].(map[string]interface{})
+					if linkInterface["rel"] == reconfigGetLinkTitle {
+						//Get resource reconfiguration template link
+						reconfigGetLink = linkInterface["href"].(string)
+					}
+					if linkInterface["rel"] == reconfigPostLinkTitle {
+						//Get resourcce reconfiguration request post link
+						reconfigPostLink = linkInterface["href"].(string)
+					}
+				}
+
+				resourceAction := new(ResourceActionTemplate)
+				apiError := new(APIError)
+				//Get reource child reconfiguration template json
+				response, err := client.HTTPClient.New().Get(reconfigGetLink).
+					Receive(resourceAction, apiError)
+				response.Close = true
+
+				if !apiError.isEmpty() {
+					return apiError
+				}
+				if err != nil {
+					return err
+				}
+				for configKey := range resourceConfiguration {
+					log.Println("--------configKey >> ", configKey)
+					//compare resource list (resource_name) with user configuration fields
+					if strings.Contains(configKey, componentName+".") {
+						//If user_configuration contains resource_list element
+						// then split user configuration key into resource_name and field_name
+						splitedArray := strings.Split(configKey, componentName+".")
+						//actionResponseInterface := actionResponse.(map[string]interface{})
+						//Function call which changes the template field values with  user values
+						log.Println("before change resourceAction.Data => ",resourceAction.Data )
+						//Replace existing values with new values in resource child template
+						resourceAction.Data = changeTemplateValue(
+							resourceAction.Data,
+							splitedArray[1],
+							resourceConfiguration[configKey])
+						log.Println("after change resourceAction.Data => ",resourceAction.Data )
+
+					}
+					//delete used user configuration
+					//delete(resourceConfiguration, configKey)
+				}
+				//If template value got changed then set post call and update resource child
+				resourceAction2 := new(ResourceActionTemplate)
+				apiError2 := new(APIError)
+
+				response2, err2 := client.HTTPClient.New().Post(reconfigPostLink).
+					BodyJSON(resourceAction).Receive(resourceAction2, apiError2)
+
+				if response2.StatusCode != 201 {
+					return apiError2
+				}
+				response2.Close = true
+				if !apiError2.isEmpty() {
+					return apiError2
+				}
+
+				if err2 != nil {
+					return err2
+				}
+			}
+		}
+	}
 	return nil
 }
-
 //Function use - To read configuration of centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func readResource(d *schema.ResourceData, meta interface{}) error {
