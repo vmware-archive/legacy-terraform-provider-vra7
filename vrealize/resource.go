@@ -111,6 +111,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			Optional: true,
 		},
+    "businessgroup_id": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -209,6 +214,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	}
 	log.Printf("createResource->templateCatalogItem.Data %v\n", templateCatalogItem.Data)
+
+  if len(d.Get("businessgroup_id").(string)) > 0 {
+    templateCatalogItem.BusinessGroupID = d.Get("businessgroup_id").(string)
+  }
 
 	//Get all resource keys from blueprint in array
 	var keyList []string
