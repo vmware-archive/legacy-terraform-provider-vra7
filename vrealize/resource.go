@@ -609,6 +609,7 @@ func updateResourceConfigurationMap(
 						configValue1 = strconv.FormatInt(updatedValue.(int64), 10)
 					} else {
 						configValue1 = updatedValue
+
 					}
 					changed = true
 				}
