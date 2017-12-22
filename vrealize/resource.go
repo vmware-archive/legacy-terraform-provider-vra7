@@ -2,8 +2,10 @@ package vrealize
 
 import (
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 	"encoding/json"
@@ -13,13 +15,12 @@ import (
 //ResourceActionTemplate - is used to store information
 //related to resource action template information.
 type ResourceActionTemplate struct {
-	Type			string			`json:"type"`
-	ResourceID		string			`json:"resourceId"`
-	ActionID		string			`json:"actionId"`
-	Description		string			`json:"description"`
-	Data			map[string]interface{}	`json:"data"`
+	Type        string                 `json:"type"`
+	ResourceID  string                 `json:"resourceId"`
+	ActionID    string                 `json:"actionId"`
+	Description string                 `json:"description"`
+	Data        map[string]interface{} `json:"data"`
 }
-
 
 //ResourceViewsTemplate - is used to store information
 //related to resource template information.
@@ -149,6 +150,7 @@ func setResourceSchema() map[string]*schema.Schema {
 		"resource_configuration": {
 			Type:     schema.TypeMap,
 			Optional: true,
+			Computed: true,
 			Elem: &schema.Schema{
 				Type:     schema.TypeMap,
 				Optional: true,
@@ -462,13 +464,13 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						splitedArray := strings.Split(configKey, componentName+".")
 						//actionResponseInterface := actionResponse.(map[string]interface{})
 						//Function call which changes the template field values with  user values
-						log.Println("before change resourceAction.Data => ",resourceAction.Data )
+						log.Println("before change resourceAction.Data => ", resourceAction.Data)
 						//Replace existing values with new values in resource child template
 						resourceAction.Data = changeTemplateValue(
 							resourceAction.Data,
 							splitedArray[1],
 							resourceConfiguration[configKey])
-						log.Println("after change resourceAction.Data => ",resourceAction.Data )
+						log.Println("after change resourceAction.Data => ", resourceAction.Data)
 
 					}
 					//delete used user configuration
@@ -497,6 +499,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	return nil
 }
+
 //Function use - To read configuration of centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func readResource(d *schema.ResourceData, meta interface{}) error {
@@ -511,13 +514,111 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
-
 	//Update resource request status in state file
 	d.Set("request_status", resourceTemplate.Phase)
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
 	}
+
+	templateResources, errTemplate := client.GetResourceViews(requestMachineID)
+	if errTemplate != nil {
+		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+	}
+
+	reconfigGetLinkTitle := "GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
+		"machine.Reconfigure}"
+
+	var childConfig map[string]interface{}
+	childConfig = map[string]interface{}{}
+
+	for item := range templateResources.Content {
+		mapData := templateResources.Content[item].(map[string]interface{})
+		childData := mapData["data"].(map[string]interface{})
+		childLinks := mapData["links"].([]interface{})
+		if childData["Component"] != nil {
+			componentName := childData["Component"].(string)
+			var reconfigGetLink string
+			for link := range childLinks {
+				linkInterface := childLinks[link].(map[string]interface{})
+				if linkInterface["rel"] == reconfigGetLinkTitle {
+					//Get resource reconfiguration template link
+					reconfigGetLink = linkInterface["href"].(string)
+					break
+				}
+			}
+			resourceAction := new(ResourceActionTemplate)
+			apiError := new(APIError)
+			//Get reource child reconfiguration template json
+			resp, err := client.HTTPClient.New().Get(reconfigGetLink).Receive(resourceAction, apiError)
+			resp.Close = true
+			if !apiError.isEmpty() {
+				return apiError
+			}
+			if err != nil {
+				return err
+			}
+			childConfig[componentName] = resourceAction.Data
+		}
+	}
+
+	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+	changed := false
+
+	for index1 := range resourceConfiguration {
+		for index2 := range childConfig {
+			if strings.Contains(index1, index2+".") {
+				splitedArray := strings.Split(index1, index2+".")
+				currentValue := resourceConfiguration[index1]
+				updatedValue := getTemplateFieldValue(childConfig[index2].(map[string]interface{}), splitedArray[1])
+				log.Println("child config ", childConfig[index2])
+				log.Println("tf config field  ", splitedArray[1])
+				log.Println("currentValue  ", currentValue)
+				log.Println("updatedValue  ", updatedValue)
+				if updatedValue != currentValue {
+					if reflect.ValueOf(updatedValue).Kind() == reflect.Float64 {
+						resourceConfiguration[index1] = strconv.FormatFloat(updatedValue.(float64), 'f', 0, 64)
+					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Float32 {
+						resourceConfiguration[index1] = strconv.FormatFloat(updatedValue.(float64), 'f', 0, 32)
+					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Int {
+						resourceConfiguration[index1] = strconv.FormatInt(updatedValue.(int64), 10)
+					} else {
+						resourceConfiguration[index1] = updatedValue
+					}
+					changed = true
+				}
+			}
+		}
+	}
+	log.Println("changed ", changed)
+	if changed {
+		log.Println(reflect.ValueOf(resourceConfiguration).Kind())
+		log.Println("resourceConfiguration ", resourceConfiguration)
+		setError := d.Set("resource_configuration", resourceConfiguration)
+		if setError != nil {
+			return fmt.Errorf(setError.Error())
+		}
+	}
+
+	return nil
+}
+
+func getTemplateFieldValue(template map[string]interface{}, key string) interface{} {
+	for i := range template {
+		//If value type is map then set recursive call which will fiend field in one level down of map interface
+		if reflect.ValueOf(template[i]).Kind() == reflect.Map {
+			template, _ := template[i].(map[string]interface{})
+			resp := getTemplateFieldValue(template, key)
+			if resp != nil {
+				return resp
+			}
+		} else if i == key {
+			//If value type is not map then compare field name with provided field name
+			//If both matches then update field value with provided value
+			return template[i]
+		}
+	}
+
 	return nil
 }
 
