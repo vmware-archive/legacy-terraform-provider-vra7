@@ -237,7 +237,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			if strings.Contains(configKey, keyList[dataKey]) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-				splitedArray := strings.Split(configKey, keyList[dataKey]+".")
+				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
 				//Function call which changes the template field values with  user values
 				templateCatalogItem.Data[keyList[dataKey]] = changeTemplateValue(
 					templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
