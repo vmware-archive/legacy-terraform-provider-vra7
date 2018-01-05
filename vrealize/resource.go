@@ -14,9 +14,14 @@ import (
 //related to resource template information.
 type ResourceViewsTemplate struct {
 	Content []struct {
+		ResourceType string `json:"resourceType"`
 		ResourceID   string `json:"resourceId"`
 		RequestState string `json:"requestState"`
-		Links        []struct {
+		Name         string `json:"name"`
+		Data         struct {
+			IPAddress string `json:"ip_address"`
+		} `json:"data"`
+		Links []struct {
 			Href string `json:"href"`
 			Rel  string `json:"rel"`
 		} `json:"links"`
@@ -68,6 +73,7 @@ type RequestMachineResponse struct {
 	RequestedItemDescription string                 `json:"requestedItemDescription"`
 	Components               string                 `json:"components"`
 	StateName                string                 `json:"stateName"`
+	Name                     string                 `json:"name"`
 
 	CatalogItemProviderBinding struct {
 		BindingID   string `json:"bindingId"`
@@ -107,6 +113,21 @@ func setResourceSchema() map[string]*schema.Schema {
 			Optional: true,
 		},
 		"catalog_id": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		"name": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		"ip_address": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		"resource_type": {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
@@ -299,6 +320,31 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
+	}
+	//If request is successful then set the machine name
+	if resourceTemplate.Phase == "SUCCESSFUL" {
+		//Get resource view
+		resourceView, errTemplate := client.GetResourceViews(requestMachineID)
+		//Raise an exception if error occured while fetching resourceview
+		if errTemplate != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+		}
+
+		// Iterate through the resourceView map
+		d.Set("resource_type", "")
+		d.Set("name", "")
+		for _, i := range resourceView.Content {
+			d.Set("resource_type", i.ResourceType)
+			// set the name only if its a virtual machine
+			if i.ResourceType == "Infrastructure.Virtual" {
+				d.Set("name", i.Name)
+				d.Set("ip_address", i.Data.IPAddress)
+				d.SetConnInfo(map[string]string{
+					"host": i.Data.IPAddress,
+				})
+			}
+		}
+
 	}
 	return nil
 }
