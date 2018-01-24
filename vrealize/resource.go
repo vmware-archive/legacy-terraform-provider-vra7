@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
 	"github.com/hashicorp/terraform/helper/schema"
 )
 
@@ -113,7 +114,7 @@ func setResourceSchema() map[string]*schema.Schema {
 		"wait_timeout": {
 			Type:     schema.TypeInt,
 			Optional: true,
-			Default: 15,
+			Default:  15,
 		},
 		"request_status": {
 			Type:     schema.TypeString,
@@ -272,9 +273,9 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Set request status
 	d.Set("request_status", "SUBMITTED")
 
-	waitTimeout := d.Get("wait_timeout").(int)*60
+	waitTimeout := d.Get("wait_timeout").(int) * 60
 
-	for i :=0; i < waitTimeout/30; i++ {
+	for i := 0; i < waitTimeout/30; i++ {
 		time.Sleep(3e+10)
 		readResource(d, meta)
 
