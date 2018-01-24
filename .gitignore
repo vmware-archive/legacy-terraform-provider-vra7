@@ -4,6 +4,7 @@
 example.tf
 terraform.tfplan
 terraform.tfstate
+terraform.tfvars
 bin/
 modules-dev/
 /pkg/
@@ -29,4 +30,3 @@ terraform-provider-vra7*
 test.sh
 terraform-provider-vra.exe
 vendor/
-example/terraform.tfvars
