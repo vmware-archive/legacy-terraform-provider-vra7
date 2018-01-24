@@ -116,6 +116,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			Optional: true,
 		},
+		"wait_timeout": {
+			Type:     schema.TypeInt,
+			Optional: true,
+			Default:  15,
+		},
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
@@ -126,6 +131,15 @@ func setResourceSchema() map[string]*schema.Schema {
 			Computed: true,
 			ForceNew: true,
 			Optional: true,
+		},
+		"deployment_configuration": {
+			Type:     schema.TypeMap,
+			Optional: true,
+			Elem: &schema.Schema{
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem:     schema.TypeString,
+			},
 		},
 		"resource_configuration": {
 			Type:     schema.TypeMap,
@@ -181,9 +195,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//If catalog name is provided then get catalog ID using name for further process
 	//else if catalog id is provided then fetch catalog name
-	log.Println("print before block")
 	if len(d.Get("catalog_name").(string)) > 0 {
-		log.Println("print in block")
 		catalogID, returnErr := client.readCatalogIDByName(d.Get("catalog_name").(string))
 		log.Printf("createResource->catalog_id %v\n", catalogID)
 		if returnErr != nil {
@@ -246,7 +258,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			if strings.Contains(configKey, keyList[dataKey]) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-				splitedArray := strings.Split(configKey, keyList[dataKey]+".")
+				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
 				//Function call which changes the template field values with  user values
 				templateCatalogItem.Data[keyList[dataKey]] = changeTemplateValue(
 					templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
@@ -256,6 +268,20 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		}
 		//delete used user configuration
 		delete(resourceConfiguration, configKey)
+	}
+	//update template with deployment level config
+	// limit to description and reasons as other things could get us into trouble
+	deploymentConfiguration, _ := d.Get("deployment_configuration").(map[string]interface{})
+	for depField := range deploymentConfiguration {
+		fieldstr := fmt.Sprintf("%s", depField)
+		switch fieldstr {
+		case "description":
+			templateCatalogItem.Description = deploymentConfiguration[depField].(string)
+		case "reasons":
+			templateCatalogItem.Reasons = deploymentConfiguration[depField].(string)
+		default:
+			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, deploymentConfiguration[depField])
+		}
 	}
 	//Log print of template after values updated
 	log.Printf("Updated template - %v\n", templateCatalogItem.Data)
@@ -278,6 +304,35 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	d.SetId(requestMachine.ID)
 	//Set request status
 	d.Set("request_status", "SUBMITTED")
+
+	waitTimeout := d.Get("wait_timeout").(int) * 60
+
+	for i := 0; i < waitTimeout/30; i++ {
+		time.Sleep(3e+10)
+		readResource(d, meta)
+
+		if d.Get("request_status") == "SUCCESSFUL" {
+			return nil
+		}
+		if d.Get("request_status") == "FAILED" {
+			//If request is failed during the time then
+			//unset resource details from state.
+			d.SetId("")
+			return fmt.Errorf("instance got failed while creating." +
+				" kindly check detail for more information")
+		}
+	}
+	if d.Get("request_status") == "IN_PROGRESS" {
+		//If request is in_progress state during the time then
+		//keep resource details in state files and throw an error
+		//so that the child resource won't go for create call.
+		//If execution gets timed-out and status is in progress
+		//then dependent machine won't be get created in this iteration.
+		//A user needs to ensure that the status should be a success state
+		//using terraform refresh command and hit terraform apply again.
+		return fmt.Errorf("resource is still being created")
+	}
+
 	return nil
 }
 
@@ -343,6 +398,10 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//Set a delete machine template function call.
 	//Which will fetch and return the delete machine template from the given template
 	DestroyMachineTemplate, resourceTemplate, errDestroyAction := client.GetDestroyActionTemplate(templateResources)
+	if errDestroyAction.Error() == "resource is not created or not found" {
+		d.SetId("")
+		return fmt.Errorf("possibly resource got deleted outside terraform")
+	}
 	if errDestroyAction != nil {
 		return fmt.Errorf("Destory Machine action template failed to load: %v", errDestroyAction)
 	}

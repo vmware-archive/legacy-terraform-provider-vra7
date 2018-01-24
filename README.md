@@ -9,8 +9,8 @@ These instructions will get you a copy of the project up and run on your local m
 
 ## Prerequisites
 
-To make plugin up and running you need following things.
-* [Terraform 9.8 or above](https://www.terraform.io/downloads.html)
+To get the vRA plugin up and running you need the following things.
+* [Terraform 0.9 or above](https://www.terraform.io/downloads.html)
 * [Go Language 1.9.2 or above](https://golang.org/dl/)
 * [dep - new dependency management tool for Go](https://github.com/golang/dep)
 
@@ -106,7 +106,7 @@ Navigate to *C:\TerraformPluginProject\src\github.com\vmware\terraform-provider-
 
 ## Create Terraform Configuration file
 
-In VMware vRA terraform configuration file contains two objects
+The VMware vRA terraform configuration file contains two objects
 
 ### Provider
 
@@ -120,6 +120,7 @@ Provider block contains four mandatory fields
 * **password** - *vRA portal password*
 * **tenant** - *vRA portal tenant*
 * **host** - *End point of REST API*
+* **insecure** - *In case of self-signed certificates. Default value is false.*
 
 Example
 
@@ -129,6 +130,7 @@ Example
       password = "password123!"
       tenant = "corp.local.tenant"
       host = "http://myvra.example.com/"
+      insecure = false
     }
 
 ```
@@ -152,13 +154,15 @@ Resource block contains two mandatory and three optional fields as follows
 
 * **catalog_name** - *catalog_name is a mandatory field which contains valid catalog name from your vRA*
 
-* **catalog_id** - *catalog_id is also a mandatory field but optional to catalog_name which contains valid catalog_id from your vRA. You either include catalog_name or catalo_id but one field should be present in resource configuration.*
+* **catalog_id** - *catalog_id is also a mandatory field but optional to catalog_name which contains valid catalog_id from your vRA. You either include catalog_name or catalog_id but one field should be present in resource configuration.*
 
 * **businessgroup_id** - *This is an optional field. You can specify a different Business Group ID from what provided by default in the template reques, provided that your account is allowed to do it*
 
-* **resource_configuration** - *This is optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
+* **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
 
-* **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
+* **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
+
+* **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
 
 * **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
@@ -175,6 +179,10 @@ resource "vra7_resource" "example_machine1" {
      }
      catalog_configuration = {
          lease_days = "5"
+     }
+     deployment_configuration = {
+         reasons      = "I have some"
+         description  = "deployment via terraform"
      }
      count = 3
 }
@@ -201,20 +209,20 @@ Save this configuration in main.tf in a path where the binary is placed.
 
 ## Execution
 
-These are the terraform commands that can be used on vRA plugin as follows.
+These are the Terraform commands that can be used for the vRA plugin:
 * **terraform init** - *The init command is used to initialize a working directory containing Terraform configuration files.*
 
 * **terraform plan** - *Plan command shows plan for resources like how many resources will be provisioned and how many will be destroyed.*
 
-* **terraform apply** - *apply is responsible to execute actual calls for provision resources.*
+* **terraform apply** - *apply is responsible to execute actual calls to provision resources.*
 
-* **terraform refresh** - *By using refresh command you can check status of request.*
+* **terraform refresh** - *By using the refresh command you can check the status of the request.*
 
 * **terraform show** - *show will set a console output for resource configuration and request status.*
 
 * **terraform destroy** - *destroy command will destroy all the  resources present in terraform configuration file.*
 
-Navigate to the location where main.tf and binary are placed and use above commands as needed.
+Navigate to the location where main.tf and binary are placed and use the above commands as needed.
 
 ## Contributing
 
