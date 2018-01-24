@@ -10,7 +10,7 @@ These instructions will get you a copy of the project up and run on your local m
 ## Prerequisites
 
 To get the vRA plugin up and running you need the following things.
-* [Terraform 9.8 or above](https://www.terraform.io/downloads.html)
+* [Terraform 0.9 or above](https://www.terraform.io/downloads.html)
 * [Go Language 1.9.2 or above](https://golang.org/dl/)
 * [dep - new dependency management tool for Go](https://github.com/golang/dep)
 
@@ -120,6 +120,7 @@ Provider block contains four mandatory fields
 * **password** - *vRA portal password*
 * **tenant** - *vRA portal tenant*
 * **host** - *End point of REST API*
+* **insecure** - *In case of self-signed certificates. Default value is false.*
 
 Example
 
@@ -129,6 +130,7 @@ Example
       password = "password123!"
       tenant = "corp.local.tenant"
       host = "http://myvra.example.com/"
+      insecure = false
     }
 
 ```
@@ -158,6 +160,8 @@ Resource block contains two mandatory and three optional fields as follows
 
 * **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
 
+* **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
+
 * **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
 Example 1
@@ -173,6 +177,10 @@ resource "vra7_resource" "example_machine1" {
      }
      catalog_configuration = {
          lease_days = "5"
+     }
+     deployment_configuration = {
+         reasons      = "I have some"
+         description  = "deployment via terraform"
      }
      count = 3
 }
