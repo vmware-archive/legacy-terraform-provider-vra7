@@ -127,6 +127,15 @@ func setResourceSchema() map[string]*schema.Schema {
 			ForceNew: true,
 			Optional: true,
 		},
+		"deployment_configuration": {
+			Type:     schema.TypeMap,
+			Optional: true,
+			Elem: &schema.Schema{
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem:     schema.TypeString,
+			},
+		},
 		"resource_configuration": {
 			Type:     schema.TypeMap,
 			Optional: true,
@@ -250,6 +259,20 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		}
 		//delete used user configuration
 		delete(resourceConfiguration, configKey)
+	}
+	//update template with deployment level config
+	// limit to description and reasons as other things could get us into trouble
+	deploymentConfiguration, _ := d.Get("deployment_configuration").(map[string]interface{})
+	for depField := range deploymentConfiguration {
+		fieldstr := fmt.Sprintf("%s", depField)
+		switch fieldstr {
+		case "description":
+			templateCatalogItem.Description = deploymentConfiguration[depField].(string)
+		case "reasons":
+			templateCatalogItem.Reasons = deploymentConfiguration[depField].(string)
+		default:
+			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, deploymentConfiguration[depField])
+		}
 	}
 	//Log print of template after values updated
 	log.Printf("Updated template - %v\n", templateCatalogItem.Data)
