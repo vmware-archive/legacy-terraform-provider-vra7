@@ -150,21 +150,28 @@ resource "vra7" "<resource_name1>" {
 }
 ```
 
-Resource block contains two mandatory and three optional fields as follows
+The resource block contains mandatory and optional fields as follows:
 
-* **catalog_name** - *catalog_name is a mandatory field which contains valid catalog name from your vRA*
+Mandatory:
 
-* **catalog_id** - *catalog_id is also a mandatory field but optional to catalog_name which contains valid catalog_id from your vRA. You either include catalog_name or catalog_id but one field should be present in resource configuration.*
+One of catalog\_name or catalog\_id must be specified in the resource configuration.
+
+* **catalog_name** - *catalog_name is a field which contains valid catalog name from your vRA*
+
+* **catalog_id** - *catalog_id is a field which contains a valid catalog id from your vRA.* 
+
+Optional:
 
 * **businessgroup_id** - *This is an optional field. You can specify a different Business Group ID from what provided by default in the template reques, provided that your account is allowed to do it*
 
-* **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
-
 * **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
+
+* **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
 * **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
 
-* **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
+* **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
+
 
 Example 1
 
