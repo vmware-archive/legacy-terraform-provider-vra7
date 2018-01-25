@@ -156,6 +156,8 @@ Resource block contains two mandatory and three optional fields as follows
 
 * **catalog_id** - *catalog_id is also a mandatory field but optional to catalog_name which contains valid catalog_id from your vRA. You either include catalog_name or catalog_id but one field should be present in resource configuration.*
 
+* **businessgroup_id** - *This is an optional field. You can specify a different Business Group ID from what provided by default in the template reques, provided that your account is allowed to do it*
+
 * **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
 
 * **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
