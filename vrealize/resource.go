@@ -170,14 +170,11 @@ func changeTemplateValue(templateInterface map[string]interface{}, field string,
 func addTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	//simplest case is adding a simple value. Leaving as a func in case there's a need to do more complicated additions later
 	//	templateInterface[data]
-	log.Printf("In Add TemplateValue field = [%s], value = [%+v],tInt = [%+v]", field, value, templateInterface)
 	for i := range templateInterface {
 		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map && i == "data" {
 			template, _ := templateInterface[i].(map[string]interface{})
 			templateInterface[i] = addTemplateValue(template, field, value)
-			log.Printf("Back from recurse addTVa")
 		} else { //if i == "data" {
-			log.Printf("Adding ti[%s] = %s", field, value)
 			templateInterface[field] = value
 		}
 	}
