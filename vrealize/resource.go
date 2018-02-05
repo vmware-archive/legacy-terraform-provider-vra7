@@ -597,6 +597,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+//getTemplateFieldValue is use to check and return value of argument key
 func getTemplateFieldValue(template map[string]interface{}, key string) interface{} {
 	for i := range template {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
