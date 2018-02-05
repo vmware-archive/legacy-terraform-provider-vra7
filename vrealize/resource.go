@@ -2,7 +2,6 @@ package vrealize
 
 import (
 	"fmt"
-	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
 	"strconv"
@@ -460,7 +459,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						//Function call which changes the template field values with  user values
 						log.Println("before change resourceAction.Data => ", resourceAction.Data)
 						//Replace existing values with new values in resource child template
-						resourceAction.Data = changeTemplateValue(
+						resourceAction.Data, _ = changeTemplateValue(
 							resourceAction.Data,
 							splitedArray[1],
 							resourceConfiguration[configKey])
