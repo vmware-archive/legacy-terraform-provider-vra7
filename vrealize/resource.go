@@ -1,15 +1,14 @@
 package vrealize
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
-
-	"encoding/json"
-
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -161,6 +160,14 @@ func setResourceSchema() map[string]*schema.Schema {
 				Elem:     schema.TypeString,
 			},
 		},
+		"scale_resource": {
+			Type: schema.TypeMap,
+			Elem: &schema.Schema{
+				Type: schema.TypeFloat,
+			},
+			Computed: true,
+			Optional: true,
+		},
 	}
 }
 
@@ -211,6 +218,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//If catalog_name and catalog_id both not provided then throw an error
 	if len(d.Get("catalog_name").(string)) <= 0 && len(d.Get("catalog_id").(string)) <= 0 {
 		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
+	}
+
+	if d.Get("scale_resource") != nil {
+		d.Set("scale_resource", nil)
 	}
 
 	//If catalog name is provided then get catalog ID using name for further process
@@ -390,6 +401,119 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 //Function use - to update centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func updateResource(d *schema.ResourceData, meta interface{}) error {
+	requestMachineID := d.Id()
+	client := meta.(*APIClient)
+
+	//Check if resource scaling configuration has a change
+	if d.HasChange("scale_resource") {
+		//Make sure deployment is in successful state before scaling operation
+		if d.Get("request_status") != "SUCCESSFUL" {
+			return fmt.Errorf("request_status needs to be in SUCCESSFUL for scaling changes")
+		}
+		templateResources, errTemplate := client.GetResourceViews(requestMachineID)
+		if errTemplate != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+		}
+		//scale in code start
+		scaleInActionTemplate, _, scaleInActionError := client.getScaleInActionTemplate(templateResources)
+		if scaleInActionError != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", scaleInActionError)
+		}
+		scaleInResourceConfiguration, _ := scaleInActionTemplate.Data.(map[string]interface{})
+		_, newScaleInData := d.GetChange("scale_resource")
+		scaleInItemData := newScaleInData.(map[string]interface{})
+		scaleInFlag := false
+		//Iterate over items available for scaling
+		for item := range scaleInResourceConfiguration {
+			itemData := scaleInResourceConfiguration[item].(map[string]interface{})
+			itemDataCluster := itemData["data"].(map[string]interface{})
+			_cluster, _ := itemDataCluster["_cluster"].(float64)
+			//Check if configuration provided is valid or not
+			if scaleInItemData[item] == nil {
+				return fmt.Errorf("item missing:" +
+					"either item is missing from template or wrong name provided in configuration")
+			}
+			changedValues, _ := strconv.ParseFloat(scaleInItemData[item].(string), 64)
+			//Check for specific resource change
+			//This is to validate where it should go for scaleIn or not
+			if changedValues < _cluster {
+				scaleInFlag = true
+				itemDataCluster["_cluster"] = changedValues
+				itemData["data"] = itemDataCluster
+				scaleInResourceConfiguration[item] = itemData
+			}
+		}
+		//If updates are available for scaleIn then proceed for scaleIn
+		if scaleInFlag == true {
+			PostURL := client.getScaleInActionPostURL(templateResources)
+			actionResponse := new(ActionResponseTemplate)
+			apiError := new(APIError)
+			scaleInActionTemplate.Data = scaleInResourceConfiguration
+
+			//Set a REST call for scaleIn resource items
+			_, err := client.HTTPClient.New().Post(PostURL).
+				BodyJSON(scaleInActionTemplate).Receive(actionResponse, apiError)
+
+			if err != nil {
+				return err
+			}
+			if !apiError.isEmpty() {
+				return apiError
+			}
+
+		}
+		//scale in code end
+		//scale out code start
+		scaleOutActionTemplate, _, ScaleOutActionError := client.getScaleInActionTemplate(templateResources)
+		if ScaleOutActionError != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", ScaleOutActionError)
+		}
+		scaleOutResourceConfiguration, _ := scaleOutActionTemplate.Data.(map[string]interface{})
+		_, newScaleOutData := d.GetChange("scale_resource")
+		scaleOutItemData := newScaleOutData.(map[string]interface{})
+		scaleOutFlag := false
+		//Iterate over items available for scaling
+		for item := range scaleOutResourceConfiguration {
+			itemData := scaleOutResourceConfiguration[item].(map[string]interface{})
+			itemDataCluster := itemData["data"].(map[string]interface{})
+			_cluster, _ := itemDataCluster["_cluster"].(float64)
+			//Check if configuration provided is valid or not
+			if scaleOutItemData[item] == nil {
+				return fmt.Errorf("item missing:" +
+					"either item is missing from template or wrong name provided in configuration")
+			}
+			changedValues, _ := strconv.ParseFloat(scaleOutItemData[item].(string), 64)
+			//Check for specific resource change
+			//This is to validate where it should go for scaleOut or not
+			if changedValues > _cluster {
+				scaleOutFlag = true
+				itemDataCluster["_cluster"] = changedValues
+				itemData["data"] = itemDataCluster
+				scaleOutResourceConfiguration[item] = itemData
+			}
+		}
+		//If updates are available for scaleIn then proceed for scaleOut
+		if scaleOutFlag == true {
+			PostURL := client.getScaleOutActionPostURL(templateResources)
+			actionResponse := new(ActionResponseTemplate)
+			apiError := new(APIError)
+			scaleOutActionTemplate.Data = scaleOutResourceConfiguration
+
+			//Set a REST call for scaleIn resource items
+			_, err := client.HTTPClient.New().Post(PostURL).
+				BodyJSON(scaleOutActionTemplate).Receive(actionResponse, apiError)
+
+			if err != nil {
+				return err
+			}
+			if !apiError.isEmpty() {
+				return apiError
+			}
+
+		}
+		//scale out code end
+
+	}
 	log.Println(d)
 	return nil
 }
