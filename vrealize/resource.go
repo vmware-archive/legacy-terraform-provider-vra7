@@ -360,8 +360,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	for i := 0; i < waitTimeout/30; i++ {
 		time.Sleep(3e+10)
-		readResource(d, meta)
+		readError := readResource(d, meta)
 
+		if readError != nil {
+			return readError
+		}
 		if d.Get("request_status") == "SUCCESSFUL" {
 			return nil
 		}
@@ -424,6 +427,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
+	}
+	if d.Get("request_status") == "REJECTED" {
+		//If request gets rejected then resource won't get added into state file
+		d.SetId("")
+		return fmt.Errorf("Resource provisioning request rejected")
 	}
 	return nil
 }
