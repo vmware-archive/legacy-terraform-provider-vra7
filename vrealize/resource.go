@@ -372,6 +372,16 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			return fmt.Errorf("instance got failed while creating." +
 				" kindly check detail for more information")
 		}
+		//rejection handling if approval policy applied to provisioning
+		//and request is rejected
+		if d.Get("request_status") == "REJECTED" {
+			//If request gets rejected then resource won't get added into state file
+			d.SetId("")
+			return fmt.Errorf("Resource provisioning request rejected")
+		}
+	}
+	if d.Get("request_status") == "PENDING_PRE_APPROVAL" {
+		return fmt.Errorf("Request is not approved yet")
 	}
 	if d.Get("request_status") == "IN_PROGRESS" {
 		//If request is in_progress state during the time then
