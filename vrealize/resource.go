@@ -452,7 +452,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					return err
 				}
 				for configKey := range resourceConfiguration {
-					log.Println("--------configKey >> ", configKey)
 					//compare resource list (resource_name) with user configuration fields
 					if strings.Contains(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
@@ -460,13 +459,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						splitedArray := strings.Split(configKey, componentName+".")
 						//actionResponseInterface := actionResponse.(map[string]interface{})
 						//Function call which changes the template field values with  user values
-						log.Println("before change resourceAction.Data => ", resourceAction.Data)
 						//Replace existing values with new values in resource child template
 						resourceAction.Data, _ = changeTemplateValue(
 							resourceAction.Data,
 							splitedArray[1],
 							resourceConfiguration[configKey])
-						log.Println("after change resourceAction.Data => ", resourceAction.Data)
 
 					}
 					//delete used user configuration
@@ -567,10 +564,6 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 				splitedArray := strings.Split(index1, index2+".")
 				currentValue := resourceConfiguration[index1]
 				updatedValue := getTemplateFieldValue(childConfig[index2].(map[string]interface{}), splitedArray[1])
-				log.Println("child config ", childConfig[index2])
-				log.Println("tf config field  ", splitedArray[1])
-				log.Println("currentValue  ", currentValue)
-				log.Println("updatedValue  ", updatedValue)
 				if updatedValue != currentValue {
 					if reflect.ValueOf(updatedValue).Kind() == reflect.Float64 {
 						resourceConfiguration[index1] = strconv.FormatFloat(updatedValue.(float64), 'f', 0, 64)
@@ -586,10 +579,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
-	log.Println("changed ", changed)
 	if changed {
-		log.Println(reflect.ValueOf(resourceConfiguration).Kind())
-		log.Println("resourceConfiguration ", resourceConfiguration)
 		setError := d.Set("resource_configuration", resourceConfiguration)
 		if setError != nil {
 			return fmt.Errorf(setError.Error())
