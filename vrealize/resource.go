@@ -422,7 +422,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			//If component is not empty
 			if childData["Component"] != nil {
 				componentName := childData["Component"].(string)
-				log.Println("componentName >> ", componentName)
 				var reconfigGetLink string
 				var reconfigPostLink string
 				//Iterate over the links present in content elements
