@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"os"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -313,7 +312,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Add remaining keys to template vs updating values
 	// first clean out used values
 	for usedKey := range usedConfigKeys {
-		log.Println("in create loop 2 > ", usedKey)
 		delete(resourceConfiguration, usedConfigKeys[usedKey])
 	}
 	for configKey2 := range resourceConfiguration {
