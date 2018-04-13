@@ -1,17 +1,14 @@
 package vrealize
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
-
-	"encoding/json"
-
-	"github.com/hashicorp/terraform/helper/schema"
-	"os"
-	"strconv"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -154,7 +151,7 @@ func setResourceSchema() map[string]*schema.Schema {
 				Type:     schema.TypeMap,
 				Optional: true,
 				Elem:     schema.TypeString,
-				Computed:true,
+				Computed: true,
 			},
 		},
 		"catalog_configuration": {
@@ -284,13 +281,8 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
-	f, _ := os.OpenFile("updateFieldLog.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer f.Close()
-	log.SetOutput(f)
 	for configKey := range resourceConfiguration {
 		if resourceConfiguration[configKey] != nil && resourceConfiguration[configKey] != "" {
-			log.Println("in create loop 1 > ", configKey)
-			log.Println("in create loop 1 value > ", resourceConfiguration[configKey])
 			for dataKey := range keyList {
 				//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
 				if strings.Contains(configKey, keyList[dataKey]) {
@@ -307,8 +299,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 						resourceConfiguration[configKey])
 					if replaced {
 						usedConfigKeys = append(usedConfigKeys, configKey)
-					} else {
-						log.Printf("%s was not replaced", configKey)
 					}
 				}
 			}
@@ -319,18 +309,13 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Add remaining keys to template vs updating values
 	// first clean out used values
 	for usedKey := range usedConfigKeys {
-		log.Println("in create loop 2 > ", usedKey)
 		delete(resourceConfiguration, usedConfigKeys[usedKey])
 	}
-	log.Println("Entering Add Loop")
 	for configKey2 := range resourceConfiguration {
 		if resourceConfiguration[configKey2] != nil && resourceConfiguration[configKey2] != "" {
-			log.Println("in create loop 3 > ", configKey2)
 			for dataKey := range keyList {
-				log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
 				if strings.Contains(configKey2, keyList[dataKey]) {
 					splitArray := strings.Split(configKey2, keyList[dataKey]+".")
-					log.Printf("Add Loop Contains %+v", splitArray[1])
 					resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
 					resourceItem = addTemplateValue(
 						resourceItem["data"].(map[string]interface{}),
@@ -415,12 +400,9 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 }
 
 func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
-	f, _ := os.OpenFile("updateFieldLog.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer f.Close()
-	log.SetOutput(f)
 	//Get requester machine ID from schema.dataresource
 	requestMachineID := d.Id()
-		//Get client handle
+	//Get client handle
 	client := meta.(*APIClient)
 	templateResources, errTemplate := client.GetResourceViews(requestMachineID)
 	if errTemplate != nil {
@@ -437,7 +419,6 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 		childData := mapData["data"].(map[string]interface{})
 		childLinks := mapData["links"].([]interface{})
 		//If component is not empty
-		log.Println("Component > ", childData["Component"])
 		if childData["Component"] != nil {
 			componentName := childData["Component"].(string)
 			var reconfigGetLink string
@@ -464,34 +445,26 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 			}
 
 			for configKey := range resourceConfiguration {
-				log.Println("configKey > ", configKey)
 				if resourceConfiguration[configKey] == nil || resourceConfiguration[configKey] == "" {
-					log.Println("componentName > ", componentName)
-					log.Println("resourceConfiguration[configKey] > ", resourceConfiguration[configKey])
 					if strings.Contains(configKey, componentName+".") {
 						list1 := strings.Split(configKey, componentName+".")
 						returnValue := getTemplateValue(resourceAction.Data, list1[1])
 
 						if returnValue != nil {
-							log.Println("resourceConfiguration > ", resourceConfiguration)
-							log.Println("returnValue > ", returnValue)
-
-							log.Println("resourceConfiguration > ", resourceConfiguration)
 							if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
 								strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
 								//errSet := d.Set("resource_configuration."+configKey+"", strValue)
 								resourceConfiguration[configKey] = strValue
 								errSet := d.Set("resource_configuration", resourceConfiguration)
-								log.Println("errSet > ", errSet)
-							}else {
+								if errSet != nil {
+									return errSet
+								}
+							} else {
 								errSet := d.Set("resource_configuration", resourceConfiguration)
-								log.Println("errSet > ", errSet)
+								if errSet != nil {
+									return errSet
+								}
 							}
-
-							//test := make(map[string]interface{})
-							//test[configKey] = returnValue.(string)
-							//errSet = d.Set("resource_configuration", test)
-							//log.Println("errSet > ", errSet)
 						}
 					}
 
@@ -502,7 +475,7 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func getTemplateValue(templateInterface map[string]interface{}, field string) (interface{}) {
+func getTemplateValue(templateInterface map[string]interface{}, field string) interface{} {
 	//Iterate over the map to get field provided as an argument
 	for i := range templateInterface {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
@@ -542,15 +515,10 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
 	}
-	f, _ := os.OpenFile("updateFieldLog.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	defer f.Close()
-	log.SetOutput(f)
-	log.Println("in read function")
 	fetchError := fetchResourceFieldsValues(d, meta)
 	if fetchError != nil {
 		return fetchError
 	}
-	log.Println("fetching completed")
 
 	return nil
 }
@@ -715,7 +683,6 @@ func (c *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachi
 
 	jsonBody, jErr := json.Marshal(template)
 	if jErr != nil {
-		log.Printf("Error marshalling template as JSON")
 		return nil, jErr
 	} else {
 		log.Printf("JSON Request Info: %s", jsonBody)
