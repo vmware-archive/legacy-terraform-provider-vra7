@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"os"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -477,7 +476,7 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 									return errSet
 								}
 							}
-						}else{
+						} else {
 							returnValue := getTemplateValue(mapData, list1[1])
 							if returnValue != nil {
 								if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
