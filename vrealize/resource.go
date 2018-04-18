@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"os"
 )
 
 //ResourceViewsTemplate - is used to store information
@@ -404,25 +405,30 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 	requestMachineID := d.Id()
 	//Get client handle
 	client := meta.(*APIClient)
+	//Fetch resource details from vRA
 	templateResources, errTemplate := client.GetResourceViews(requestMachineID)
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
 
+	//Read terraform resource > resource_configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 
 	reconfigGetLinkTitle := "GET Template: " +
 		"{com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Reconfigure}"
 
+	//Read vRA resource content one by one
 	for item := range templateResources.Content {
 		mapData := templateResources.Content[item].(map[string]interface{})
 		childData := mapData["data"].(map[string]interface{})
 		childLinks := mapData["links"].([]interface{})
 		//If component is not empty
+		//Check if content object is child or not
 		if childData["Component"] != nil {
 			componentName := childData["Component"].(string)
 			var reconfigGetLink string
 			//Iterate over the links present in content elements
+			//Get resource child reconfiguration link
 			for link := range childLinks {
 				linkInterface := childLinks[link].(map[string]interface{})
 				if linkInterface["rel"] == reconfigGetLinkTitle {
@@ -432,7 +438,7 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 			}
 			resourceAction := new(ResourceActionTemplate)
 			apiError := new(APIError)
-			//Get reource child reconfiguration template json
+			//Get resource child reconfiguration template json
 			response, err := client.HTTPClient.New().Get(reconfigGetLink).
 				Receive(resourceAction, apiError)
 			response.Close = true
@@ -444,25 +450,54 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 				return err
 			}
 
+			//Iterate over TF resource > resource_configuration
 			for configKey := range resourceConfiguration {
+				//Check if any TF resource > resource_configuration is empty or null
 				if resourceConfiguration[configKey] == nil || resourceConfiguration[configKey] == "" {
+					//Compare vRA child resource and TF resource > resource_configuration names
 					if strings.Contains(configKey, componentName+".") {
 						list1 := strings.Split(configKey, componentName+".")
+						//Read field value from vRA child resource
 						returnValue := getTemplateValue(resourceAction.Data, list1[1])
-
+						//Check if value returned from getTemplateValue is not nil
 						if returnValue != nil {
+							//If value returned from getTemplateValue is in float64 format then
+							//convert it in string format
 							if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
 								strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
-								//errSet := d.Set("resource_configuration."+configKey+"", strValue)
 								resourceConfiguration[configKey] = strValue
 								errSet := d.Set("resource_configuration", resourceConfiguration)
+								//If set resource_configuration throws any error then return the same
 								if errSet != nil {
 									return errSet
 								}
 							} else {
+								//If value type is string then set it as it is
+								resourceConfiguration[configKey] = returnValue
 								errSet := d.Set("resource_configuration", resourceConfiguration)
 								if errSet != nil {
+									//If set resource_configuration throws any error then return the same
 									return errSet
+								}
+							}
+						}else{
+							returnValue := getTemplateValue(mapData, list1[1])
+							if returnValue != nil {
+								if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
+									strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
+									resourceConfiguration[configKey] = strValue
+									errSet := d.Set("resource_configuration", resourceConfiguration)
+									if errSet != nil {
+										//If set resource_configuration throws any error then return the same
+										return errSet
+									}
+								} else {
+									resourceConfiguration[configKey] = returnValue
+									errSet := d.Set("resource_configuration", resourceConfiguration)
+									if errSet != nil {
+										//If set resource_configuration throws any error then return the same
+										return errSet
+									}
 								}
 							}
 						}
