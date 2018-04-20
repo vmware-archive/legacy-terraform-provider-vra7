@@ -15,14 +15,14 @@ resource "vra7_resource" "CentOS_machine" {
     //CPU and IP address will get updated
     //with actual values of deployment
     //on `terraform refresh'
-    CentOS_6.3.cpu = ""
-    CentOS_6.3.ip_address = ""
+    CentOs.cpu = ""
+    Win.ip_address = ""
   }
 }
-output "machine_ip" {
-  value = "${vra7_resource.CentOS_machine.resource_configuration.CentOS_6.3.ip_address}"
+output "centOsMachineCPU" {
+  value = "${vra7_resource.CentOS_machine.resource_configuration.CentOs.cpu}"
 }
 
-output "machine_cpu" {
-  value = "${vra7_resource.CentOS_machine.resource_configuration.CentOS_6.3.cpu}"
+output "WinMachineAddress" {
+  value = "${vra7_resource.CentOS_machine.resource_configuration.Win.ip_address}"
 }
