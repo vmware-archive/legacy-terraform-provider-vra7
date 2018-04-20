@@ -167,7 +167,7 @@ func setResourceSchema() map[string]*schema.Schema {
 //Function use - to create machine
 //Terraform call - terraform apply
 func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
-	var replaced bool
+	replaced := false
 	//Iterate over the map to get field provided as an argument
 	for i := range templateInterface {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
@@ -271,7 +271,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//array to keep track of resource values that have been used
-	usedConfigKeys := []string{}
+	usedConfigKeys := map[string]string{}
 	var replaced bool
 
 	//Update template field values with user configuration
@@ -292,7 +292,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 					splitedArray[1],
 					resourceConfiguration[configKey])
 				if replaced {
-					usedConfigKeys = append(usedConfigKeys, configKey)
+					usedConfigKeys[configKey] = resourceConfiguration[configKey].(string)
 				} else {
 					log.Printf("%s was not replaced", configKey)
 				}
@@ -300,23 +300,19 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
-	//Add remaining keys to template vs updating values
-	// first clean out used values
-	for usedKey := range usedConfigKeys {
-		delete(resourceConfiguration, usedConfigKeys[usedKey])
-	}
-	log.Println("Entering Add Loop")
 	for configKey2 := range resourceConfiguration {
-		for dataKey := range keyList {
-			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
-			if strings.Contains(configKey2, keyList[dataKey]) {
-				splitArray := strings.Split(configKey2, keyList[dataKey]+".")
-				log.Printf("Add Loop Contains %+v", splitArray[1])
-				resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
-				resourceItem = addTemplateValue(
-					resourceItem["data"].(map[string]interface{}),
-					splitArray[1],
-					resourceConfiguration[configKey2])
+		if usedConfigKeys[configKey2] == "" {
+			for dataKey := range keyList {
+				log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
+				if strings.Contains(configKey2, keyList[dataKey]) {
+					splitArray := strings.Split(configKey2, keyList[dataKey]+".")
+					log.Printf("Add Loop Contains %+v", splitArray[1])
+					resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
+					resourceItem = addTemplateValue(
+						resourceItem["data"].(map[string]interface{}),
+						splitArray[1],
+						resourceConfiguration[configKey2])
+				}
 			}
 		}
 	}
