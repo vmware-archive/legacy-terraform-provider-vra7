@@ -1,0 +1,100 @@
+'@type': "SoftwareComponentType"
+createdDate: "2016-09-28T14:26:53.506Z"
+lastUpdated: "2016-10-02T04:45:03.651Z"
+id: "Software.IIS"
+name: "IIS"
+description: "Install Specific IIS"
+publishStatus: "PUBLISHED"
+publishStatusName: "Published"
+schema:
+  fields:
+  - id: "InetPubWWWRoot"
+    label: "InetPubWWWRoot"
+    description: ""
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "defaultValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "c:\\Inetpub\\WWWRoot"
+    isMultiValued: false
+  - id: "InetPubRoot"
+    label: "InetPubRoot"
+    description: ""
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "defaultValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "c:\\Inetpub"
+    isMultiValued: false
+  - id: "host"
+    label: "Container"
+    description: ""
+    dataType:
+      type: "ref"
+      componentTypeId: "com.vmware.csp.iaas.blueprint.service"
+      classId: "Infrastructure.Machine.Schema"
+      label: "Machine"
+    state:
+      dependencies: []
+      facets:
+      - type: "mandatory"
+        value:
+          type: "constant"
+          value:
+            type: "boolean"
+            value: true
+      - type: "visible"
+        value:
+          type: "constantClause"
+          value:
+            type: "boolean"
+            value: false
+      - type: "internal"
+        value:
+          type: "constantClause"
+          value:
+            type: "boolean"
+            value: true
+    isMultiValued: false
+  - id: "InetPubLog"
+    label: "InetPubLog"
+    description: ""
+    dataType:
+      type: "primitive"
+      typeId: "STRING"
+    state:
+      dependencies: []
+      facets:
+      - type: "defaultValue"
+        value:
+          type: "constant"
+          value:
+            type: "string"
+            value: "c:\\Inetpub\\Log"
+    isMultiValued: false
+containerFieldId: "host"
+lifecycleTasks:
+- createdDate: "2016-09-28T14:26:53.507Z"
+  lastUpdated: "2016-12-23T14:11:26.936Z"
+  script:
+    scriptContent: "Write-Host \"Importing Server Manager \"\nImport-Module ServerManager\
+      \ \nAdd-WindowsFeature -Name Web-Webserver,Web-Mgmt-Console,Web-Mgmt-Compat,Web-CGI"
+    isRebootAfter: false
+    scriptTypeId: "powershell"
+  taskDescriptorRef:
+    id: "INSTALL"
+    label: "Install"
