@@ -1,10 +1,10 @@
 package vrealize
 
 import (
-	"fmt"
-	"testing"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"errors"
+	"fmt"
+	"gopkg.in/jarcoal/httpmock.v1"
+	"testing"
 )
 
 //var client APIClient

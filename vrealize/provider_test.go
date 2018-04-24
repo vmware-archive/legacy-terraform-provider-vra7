@@ -1,12 +1,12 @@
 package vrealize
 
 import (
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/terraform"
-	"testing"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/terraform"
+	"gopkg.in/jarcoal/httpmock.v1"
+	"testing"
 )
 
 var testProviders map[string]terraform.ResourceProvider
@@ -48,7 +48,7 @@ func init() {
 	}
 }
 
-func TestValidateProvider(t *testing.T)  {
+func TestValidateProvider(t *testing.T) {
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
 

@@ -1,12 +1,11 @@
 package vrealize
 
 import (
-	"testing"
-	"gopkg.in/jarcoal/httpmock.v1"
-	"fmt"
 	"errors"
+	"fmt"
+	"gopkg.in/jarcoal/httpmock.v1"
+	"testing"
 )
-
 
 func init() {
 	fmt.Println("init")
@@ -18,7 +17,6 @@ func init() {
 		true,
 	)
 }
-
 
 func TestFetchCatalogByName(t *testing.T) {
 	httpmock.Activate()
@@ -128,7 +126,6 @@ func TestFetchCatalogByID(t *testing.T) {
 	if catalogName == nil {
 		t.Errorf("Catalog Name is is nil")
 	}
-
 
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be",
 		httpmock.NewStringResponder(404, `{"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","systemMessage":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","moreInfoUrl":null}]}`))

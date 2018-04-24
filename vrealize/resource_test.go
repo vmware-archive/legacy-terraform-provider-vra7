@@ -1,15 +1,14 @@
 package vrealize
 
 import (
+	"encoding/json"
 	"errors"
 	"gopkg.in/jarcoal/httpmock.v1"
-	"testing"
-	"encoding/json"
 	"reflect"
+	"testing"
 )
 
 var client APIClient
-
 
 func TestNewClient(t *testing.T) {
 	username := "admin@myvra.local"
@@ -231,9 +230,9 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 	client.DestroyMachine(destroyActionTemplate, resourceTemplate)
 }
 
-func TestChangeValueFunction(t *testing.T){
-	template_original :=CatalogItemTemplate{}
-	template_backup :=CatalogItemTemplate{}
+func TestChangeValueFunction(t *testing.T) {
+	template_original := CatalogItemTemplate{}
+	template_backup := CatalogItemTemplate{}
 	strJson := `{"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest","catalogItemId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","requestedFor":"jason@corp.local","businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","description":null,"reasons":null,"data":{"CentOS_6.3":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*CentOS_6.3","data":{"_allocation":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"data":{"machines":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation.Machine","typeFilter":null,"data":{"machine_id":"","nics":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Nic","typeFilter":null,"data":{"address":"","assignment_type":"Static","external_address":"","id":null,"load_balancing":null,"network":null,"network_profile":null}}]}}]}},"_cluster":1,"_hasChildren":false,"cpu":1,"datacenter_location":null,"description":"Basic IaaS CentOS Machine","disks":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"data":{"capacity":3,"custom_properties":null,"id":1450725224066,"initial_location":"","is_clone":true,"label":"Hard disk 1","storage_reservation_policy":"","userCreated":false,"volumeId":0}}],"guest_customization_specification":"CentOS","max_network_adapters":-1,"max_per_user":0,"max_volumes":60,"memory":512,"nics":null,"os_arch":"x86_64","os_distribution":null,"os_type":"Linux","os_version":null,"property_groups":null,"reservation_policy":null,"security_groups":[],"security_tags":[],"storage":3}},"_archiveDays":5,"_leaseDays":null,"_number_of_instances":1,"corp192168110024":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*corp192168110024","data":{"_hasChildren":false}}}}`
 	json.Unmarshal([]byte(strJson), &template_original)
 	json.Unmarshal([]byte(strJson), &template_backup)
