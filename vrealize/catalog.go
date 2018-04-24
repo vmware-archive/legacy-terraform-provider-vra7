@@ -112,14 +112,14 @@ func (c *APIClient) readCatalogIDByName(catalogName string) (interface{}, error)
 	//Fetch all catalogs from vRA
 	path = fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews?page=1&"+
 		"limit=%d", template.Metadata.TotalElements)
-	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
-
-	if err != nil {
-		return nil, err
-	}
+	resp, errResp := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if !apiError.isEmpty() {
 		return nil, apiError
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, errResp
 	}
 
 	var catalogNameArray []string
@@ -149,9 +149,12 @@ func (c *APIClient) readCatalogIDByName(catalogName string) (interface{}, error)
 		}
 		errorMessage := strings.Join(catalogNameArray, "\n")
 		fmt.Println(errorMessage)
-
-		return nil, fmt.Errorf("There are total %d catalog present with same name.\n%s\n"+
-			"Please select from above.", len(catalogNameArray), errorMessage)
+		punctuation := "are"
+		if len(catalogNameArray) == 1 {
+			punctuation = "is"
+		}
+		return nil, fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
+			"Please select from above.", punctuation, len(catalogNameArray), errorMessage)
 	}
 
 	if !apiError.isEmpty() {

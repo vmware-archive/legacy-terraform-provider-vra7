@@ -174,6 +174,9 @@ func changeTemplateValue(templateInterface map[string]interface{}, field string,
 		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map {
 			template, _ := templateInterface[i].(map[string]interface{})
 			templateInterface[i], replaced = changeTemplateValue(template, field, value)
+			if replaced == true {
+				return templateInterface,true
+			}
 		} else if i == field {
 			//If value type is not map then compare field name with provided field name
 			//If both matches then update field value with provided value

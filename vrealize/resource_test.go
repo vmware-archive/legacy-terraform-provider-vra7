@@ -2,43 +2,14 @@ package vrealize
 
 import (
 	"errors"
-	"fmt"
 	"gopkg.in/jarcoal/httpmock.v1"
 	"testing"
+	"encoding/json"
+	"reflect"
 )
 
 var client APIClient
 
-func init() {
-	t := new(testing.T)
-	fmt.Println("init")
-	client = NewClient(
-		"admin@myvra.local",
-		"pass!@#",
-		"vsphere.local",
-		"http://localhost/",
-		true,
-	)
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZX
-		JuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY
-		4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4
-		ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
-
-	client.Authenticate()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
-
-	err := client.Authenticate()
-	if err == nil {
-		t.Errorf("Authentication should fail")
-	}
-}
 
 func TestNewClient(t *testing.T) {
 	username := "admin@myvra.local"
@@ -258,4 +229,34 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 		t.Errorf("Failed to get destroy action template %v", err)
 	}
 	client.DestroyMachine(destroyActionTemplate, resourceTemplate)
+}
+
+func TestChangeValueFunction(t *testing.T){
+	template_original :=CatalogItemTemplate{}
+	template_backup :=CatalogItemTemplate{}
+	strJson := `{"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest","catalogItemId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","requestedFor":"jason@corp.local","businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","description":null,"reasons":null,"data":{"CentOS_6.3":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*CentOS_6.3","data":{"_allocation":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"data":{"machines":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation.Machine","typeFilter":null,"data":{"machine_id":"","nics":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Nic","typeFilter":null,"data":{"address":"","assignment_type":"Static","external_address":"","id":null,"load_balancing":null,"network":null,"network_profile":null}}]}}]}},"_cluster":1,"_hasChildren":false,"cpu":1,"datacenter_location":null,"description":"Basic IaaS CentOS Machine","disks":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"data":{"capacity":3,"custom_properties":null,"id":1450725224066,"initial_location":"","is_clone":true,"label":"Hard disk 1","storage_reservation_policy":"","userCreated":false,"volumeId":0}}],"guest_customization_specification":"CentOS","max_network_adapters":-1,"max_per_user":0,"max_volumes":60,"memory":512,"nics":null,"os_arch":"x86_64","os_distribution":null,"os_type":"Linux","os_version":null,"property_groups":null,"reservation_policy":null,"security_groups":[],"security_tags":[],"storage":3}},"_archiveDays":5,"_leaseDays":null,"_number_of_instances":1,"corp192168110024":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*corp192168110024","data":{"_hasChildren":false}}}}`
+	json.Unmarshal([]byte(strJson), &template_original)
+	json.Unmarshal([]byte(strJson), &template_backup)
+	var flag bool
+
+	template_original.Data, flag = changeTemplateValue(template_original.Data, "false_field", 1000)
+	if flag != false {
+		t.Errorf("False value updated")
+	}
+
+	eq := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	if !eq {
+		t.Errorf("False value updated")
+	}
+
+	template_original.Data, flag = changeTemplateValue(template_original.Data, "storage", 1000)
+	if flag == false {
+		t.Errorf("Failed to update interface value")
+	}
+
+	eq2 := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	if eq2 {
+		t.Errorf("Failed to update interface value")
+	}
+
 }
