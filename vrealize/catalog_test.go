@@ -18,6 +18,9 @@ func init() {
 	)
 }
 
+var catalogItemId1 = "e5dd4fba-45ed-4943-b1fc-7f96239286be"
+var catalogItemId2 = "e5dd4fba-45ed-4943-b1fc-7f96239286b1"
+
 func TestFetchCatalogItemByName(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
@@ -114,10 +117,10 @@ func TestFetchCatalogItemByID(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be",
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
 		httpmock.NewStringResponder(200, `{"catalogItem":{"callbacks":null,"catalogItemTypeRef":{"id":"com.vmware.csp.component.cafe.composition.blueprint","label":"Composite Blueprint"},"dateCreated":"2015-12-22T03:16:19.289Z","description":"CentOS 6.3 IaaS Blueprint","forms":{"itemDetails":{"type":"external","formId":"composition.catalog.item.details"},"catalogRequestInfoHidden":true,"requestFormScale":"BIG","requestSubmission":{"type":"extension","extensionId":"com.vmware.vcac.core.design.blueprints.requestForm","extensionPointId":null},"requestDetails":{"type":"extension","extensionId":"com.vmware.vcac.core.design.blueprints.requestDetailsForm","extensionPointId":null},"requestPreApproval":null,"requestPostApproval":null},"iconId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","id":"e5dd4fba-45ed-4943-b1fc-7f96239286be","isNoteworthy":false,"lastUpdatedDate":"2017-01-06T05:12:56.690Z","name":"CentOS 6.3","organization":{"tenantRef":"vsphere.local","tenantLabel":"vsphere.local","subtenantRef":null,"subtenantLabel":null},"outputResourceTypeRef":{"id":"composition.resource.type.deployment","label":"Deployment"},"providerBinding":{"bindingId":"vsphere.local!::!CentOS63","providerRef":{"id":"2fbaabc5-3a48-488a-9f2a-a42616345445","label":"Blueprint Service"}},"serviceRef":{"id":"baad0ad2-8b96-4347-b188-f534dad53a0d","label":"Infrastructure"},"status":"PUBLISHED","statusName":"Published","quota":0,"version":4,"requestable":true},"entitledOrganizations":[{"tenantRef":"vsphere.local","tenantLabel":"vsphere.local","subtenantRef":"53619006-56bb-4788-9723-9eab79752cc1","subtenantLabel":"Content"}]}`))
 
-	catalogItemName, err := client.readCatalogNameByID("e5dd4fba-45ed-4943-b1fc-7f96239286be")
+	catalogItemName, err := client.readCatalogNameByID(catalogItemId1)
 
 	if err != nil {
 		t.Errorf("Error while fetching catalog item %v", err)
@@ -127,10 +130,10 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Catalog Item Name is is nil")
 	}
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be",
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
 		httpmock.NewStringResponder(404, `{"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","systemMessage":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","moreInfoUrl":null}]}`))
 
-	catalogItemName, err = client.readCatalogNameByID("e5dd4fba-45ed-4943-b1fc-7f96239286b1")
+	catalogItemName, err = client.readCatalogNameByID(catalogItemId2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")
@@ -140,9 +143,9 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Wrong catalog item data got fetched")
 	}
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286b1",
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId2,
 		httpmock.NewStringResponder(404, `{"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","systemMessage":"Unable to find the specified catalog item in the service catalog: e5dd4fba-45ed-4943-b1fc-07f96239286b.","moreInfoUrl":null}]}`))
-	catalogItemName, err = client.readCatalogNameByID("e5dd4fba-45ed-4943-b1fc-7f96239286b1")
+	catalogItemName, err = client.readCatalogNameByID(catalogItemId2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")

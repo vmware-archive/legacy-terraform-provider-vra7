@@ -149,9 +149,9 @@ func (c *APIClient) readCatalogIDByName(catalogName string) (interface{}, error)
 		}
 		errorMessage := strings.Join(catalogItemNameArray, "\n")
 		fmt.Println(errorMessage)
-		punctuation := "are"
-		if len(catalogItemNameArray) == 1 {
-			punctuation = "is"
+		punctuation := "is"
+		if len(catalogItemNameArray) > 1 {
+			punctuation = "are"
 		}
 		return nil, fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
 			"Please select from above.", punctuation, len(catalogItemNameArray), errorMessage)

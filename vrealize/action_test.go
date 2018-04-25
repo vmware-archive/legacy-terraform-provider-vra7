@@ -20,7 +20,7 @@ func init() {
 	)
 }
 
-func TestPowerOFfAction(t *testing.T) {
+func TestPowerOffAction(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
