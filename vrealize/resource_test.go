@@ -76,11 +76,11 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 	template, err := client.GetCatalogItem("e5dd4fba-45ed-4943-b1fc-7f96239286be")
 
 	if err != nil {
-		t.Errorf("Fail to get catalog template %v.", err)
+		t.Errorf("Fail to get catalog Item template %v.", err)
 	}
 
 	if len(template.CatalogItemID) == 0 {
-		t.Errorf("Catalog item id is empty.")
+		t.Errorf("Catalog Item id is empty.")
 	}
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/"+
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests/template",
@@ -93,7 +93,7 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 	}
 
 	if template != nil {
-		t.Errorf("Catalog item id is not empty.")
+		t.Errorf("Catalog Item id is not empty.")
 	}
 }
 
@@ -114,7 +114,7 @@ func TestAPIClient_RequestMachine(t *testing.T) {
 		t.Errorf("Failed to get catalog item template %v.", err)
 	}
 	if len(template.CatalogItemID) == 0 {
-		t.Errorf("Catalog Id is empty.")
+		t.Errorf("Catalog Item Id is empty.")
 	}
 
 	requestMachine, errorRequestMachine := client.RequestMachine(template)

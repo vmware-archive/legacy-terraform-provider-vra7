@@ -219,24 +219,24 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//If catalog name is provided then get catalog ID using name for further process
 	//else if catalog id is provided then fetch catalog name
 	if len(d.Get("catalog_name").(string)) > 0 {
-		catalogID, returnErr := client.readCatalogIDByName(d.Get("catalog_name").(string))
-		log.Printf("createResource->catalog_id %v\n", catalogID)
+		catalogItemID, returnErr := client.readCatalogIDByName(d.Get("catalog_name").(string))
+		log.Printf("createResource->catalog_id %v\n", catalogItemID)
 		if returnErr != nil {
 			return fmt.Errorf("%v", returnErr)
 		}
-		if catalogID == nil {
+		if catalogItemID == nil {
 			return fmt.Errorf("No catalog found with name %v", d.Get("catalog_name").(string))
-		} else if catalogID == "" {
+		} else if catalogItemID == "" {
 			return fmt.Errorf("No catalog found with name %v", d.Get("catalog_name").(string))
 		}
-		d.Set("catalog_id", catalogID.(string))
+		d.Set("catalog_id", catalogItemID.(string))
 	} else if len(d.Get("catalog_id").(string)) > 0 {
-		CatalogName, nameError := client.readCatalogNameByID(d.Get("catalog_id").(string))
+		CatalogItemName, nameError := client.readCatalogNameByID(d.Get("catalog_id").(string))
 		if nameError != nil {
 			return fmt.Errorf("%v", nameError)
 		}
 		if nameError != nil {
-			d.Set("catalog_name", CatalogName.(string))
+			d.Set("catalog_name", CatalogItemName.(string))
 		}
 	}
 	//Get catalog blueprint
