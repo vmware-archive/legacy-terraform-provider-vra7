@@ -3,12 +3,12 @@ package vrealize
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 //ResourceActionTemplate - is used to store information
