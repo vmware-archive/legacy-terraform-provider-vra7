@@ -3,12 +3,12 @@ package vrealize
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 //ResourceActionTemplate - is used to store information
@@ -598,6 +598,7 @@ func updateResourceConfigurationMap(
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
 				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
+
 				if updatedValue != currentValue {
 					if reflect.ValueOf(updatedValue).Kind() == reflect.Float64 {
 						configValue1 =
