@@ -478,20 +478,20 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				//If template value got changed then set post call and update resource child
 				resourceAction2 := new(ResourceActionTemplate)
 				apiError2 := new(APIError)
-
-				response2, err2 := client.HTTPClient.New().Post(reconfigPostLink).
+				response2, _ := client.HTTPClient.New().Post(reconfigPostLink).
 					BodyJSON(resourceAction).Receive(resourceAction2, apiError2)
 
 				if response2.StatusCode != 201 {
+					oldData, _ := d.GetChange("resource_configuration")
+					d.Set("resource_configuration",oldData)
 					return apiError2
 				}
 				response2.Close = true
 				if !apiError2.isEmpty() {
+					oldData, _ := d.GetChange("resource_configuration")
+					d.Set("resource_configuration",oldData)
+					panic(d)
 					return apiError2
-				}
-
-				if err2 != nil {
-					return err2
 				}
 			}
 		}
