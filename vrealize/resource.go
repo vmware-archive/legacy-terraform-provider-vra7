@@ -208,8 +208,9 @@ func addTemplateValue(templateInterface map[string]interface{}, field string, va
 	return templateInterface
 }
 
-//Function use - to create resource and do all related things for create resource
-//Terraform call - terraform apply
+// Terraform call - terraform apply
+// This function creates a new vRA 7 Deployment using configuration in a user's Terraform file.
+// The Deployment is produced by invoking a catalog item that is specified in the configuration.
 func createResource(d *schema.ResourceData, meta interface{}) error {
 	// Log file handler to generate logs for debugging purpose
 	// Get client handle
@@ -291,7 +292,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 				// then split user configuration key into resource_name and field_name
 				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
 				if len(splitedArray) != 2 {
-					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, keyList[dataKey]+".")
+					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, keyList[dataKey]+".")
 				}
 				//Function call which changes the template field values with  user values
 				templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
@@ -394,8 +395,9 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-//Function use - to update resource on change of any schema change
-//Terraform call - terraform refresh
+// Terraform call - terraform apply
+// This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
+// The update is performed on the Deployment using supported (day-2) actions.
 func updateResource(d *schema.ResourceData, meta interface{}) error {
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
@@ -486,15 +488,14 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 
 				if response2.StatusCode != 201 {
 					oldData, _ := d.GetChange("resource_configuration")
-					d.Set("resource_configuration",oldData)
+					d.Set("resource_configuration", oldData)
 					return apiError2
 				}
 				response2.Close = true
 				if !apiError2.isEmpty() {
 					oldData, _ := d.GetChange("resource_configuration")
-					d.Set("resource_configuration",oldData)
+					d.Set("resource_configuration", oldData)
 					panic(d)
-					return apiError2
 				}
 			}
 		}
@@ -502,8 +503,9 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-//Function use - To read configuration of centOS 6.3 machine present in state file
-//Terraform call - terraform refresh
+// Terraform call - terraform refresh
+// This function retrieves the latest state of a vRA 7 deployment. Terraform updates its state based on
+// the information returned by this function.
 func readResource(d *schema.ResourceData, meta interface{}) error {
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
@@ -787,9 +789,9 @@ func (c *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachi
 	if jErr != nil {
 		log.Printf("Error marshalling template as JSON")
 		return nil, jErr
-	} else {
-		log.Printf("JSON Request Info: %s", jsonBody)
 	}
+
+	log.Printf("JSON Request Info: %s", jsonBody)
 	//Set a REST call to create a machine
 	_, err := c.HTTPClient.New().Post(path).BodyJSON(template).
 		Receive(requestMachineRes, apiError)
