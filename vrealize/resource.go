@@ -492,7 +492,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					if !apiError2.isEmpty() {
 						oldData, _ := d.GetChange("resource_configuration")
 						d.Set("resource_configuration", oldData)
-						return apiError2
+						panic(d)
 					}
 				}
 			}
