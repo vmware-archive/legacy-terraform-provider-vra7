@@ -254,6 +254,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//Get all resource keys from blueprint in array
+	// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 	var keyList []string
 	for field := range templateCatalogItem.Data {
 		if reflect.ValueOf(templateCatalogItem.Data[field]).Kind() == reflect.Map {
@@ -280,9 +281,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	for configKey := range resourceConfiguration {
 		if resourceConfiguration[configKey] != nil && resourceConfiguration[configKey] != "" {
+			// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 			for dataKey := range keyList {
 				//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
 				if strings.Contains(configKey, keyList[dataKey]) {
+					// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 					//If user_configuration contains resource_list element
 					// then split user configuration key into resource_name and field_name
 					splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
@@ -294,6 +297,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 						templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
 						splitedArray[1],
 						resourceConfiguration[configKey])
+					// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 					if replaced {
 						usedConfigKeys = append(usedConfigKeys, configKey)
 					}
@@ -308,6 +312,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	for usedKey := range usedConfigKeys {
 		delete(resourceConfiguration, usedConfigKeys[usedKey])
 	}
+	// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 	for configKey2 := range resourceConfiguration {
 		if resourceConfiguration[configKey2] != nil && resourceConfiguration[configKey2] != "" {
 			for dataKey := range keyList {
