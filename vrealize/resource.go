@@ -1,29 +1,30 @@
 package vrealize
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
 	"log"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
-
-	"encoding/json"
-
-	"github.com/hashicorp/terraform/helper/schema"
 )
 
 //ResourceViewsTemplate - is used to store information
 //related to resource template information.
 type ResourceViewsTemplate struct {
-	Content []struct {
-		ResourceID   string `json:"resourceId"`
-		RequestState string `json:"requestState"`
-		Links        []struct {
-			Href string `json:"href"`
-			Rel  string `json:"rel"`
-		} `json:"links"`
+	Content []interface {
 	} `json:"content"`
 	Links []interface{} `json:"links"`
+}
+
+type ResourceActionTemplate struct {
+	Type        string                 `json:"type"`
+	ResourceID  string                 `json:"resourceId"`
+	ActionID    string                 `json:"actionId"`
+	Description string                 `json:"description"`
+	Data        map[string]interface{} `json:"data"`
 }
 
 //RequestStatusView - used to store REST response of
@@ -150,6 +151,7 @@ func setResourceSchema() map[string]*schema.Schema {
 				Type:     schema.TypeMap,
 				Optional: true,
 				Elem:     schema.TypeString,
+				Computed: true,
 			},
 		},
 		"catalog_configuration": {
@@ -252,6 +254,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//Get all resource keys from blueprint in array
+	// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 	var keyList []string
 	for field := range templateCatalogItem.Data {
 		if reflect.ValueOf(templateCatalogItem.Data[field]).Kind() == reflect.Map {
@@ -277,27 +280,31 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	for configKey := range resourceConfiguration {
-		for dataKey := range keyList {
-			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-			if strings.Contains(configKey, keyList[dataKey]) {
-				//If user_configuration contains resource_list element
-				// then split user configuration key into resource_name and field_name
-				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
-				if len(splitedArray) != 2 {
-					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, keyList[dataKey]+".")
-				}
-				//Function call which changes the template field values with  user values
-				templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
-					templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
-					splitedArray[1],
-					resourceConfiguration[configKey])
-				if replaced {
-					usedConfigKeys = append(usedConfigKeys, configKey)
-				} else {
-					log.Printf("%s was not replaced", configKey)
+		if resourceConfiguration[configKey] != nil && resourceConfiguration[configKey] != "" {
+			// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
+			for dataKey := range keyList {
+				//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
+				if strings.Contains(configKey, keyList[dataKey]) {
+					// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
+					//If user_configuration contains resource_list element
+					// then split user configuration key into resource_name and field_name
+					splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
+					if len(splitedArray) != 2 {
+						return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, keyList[dataKey]+".")
+					}
+					//Function call which changes the template field values with  user values
+					templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
+						templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
+						splitedArray[1],
+						resourceConfiguration[configKey])
+					// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
+					if replaced {
+						usedConfigKeys = append(usedConfigKeys, configKey)
+					}
 				}
 			}
 		}
+
 	}
 
 	//Add remaining keys to template vs updating values
@@ -305,18 +312,18 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	for usedKey := range usedConfigKeys {
 		delete(resourceConfiguration, usedConfigKeys[usedKey])
 	}
-	log.Println("Entering Add Loop")
+	// FIXME: Temporary placeholder to insert review comment. Remove once done with changes.
 	for configKey2 := range resourceConfiguration {
-		for dataKey := range keyList {
-			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
-			if strings.Contains(configKey2, keyList[dataKey]) {
-				splitArray := strings.Split(configKey2, keyList[dataKey]+".")
-				log.Printf("Add Loop Contains %+v", splitArray[1])
-				resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
-				resourceItem = addTemplateValue(
-					resourceItem["data"].(map[string]interface{}),
-					splitArray[1],
-					resourceConfiguration[configKey2])
+		if resourceConfiguration[configKey2] != nil && resourceConfiguration[configKey2] != "" {
+			for dataKey := range keyList {
+				if strings.Contains(configKey2, keyList[dataKey]) {
+					splitArray := strings.Split(configKey2, keyList[dataKey]+".")
+					resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
+					resourceItem = addTemplateValue(
+						resourceItem["data"].(map[string]interface{}),
+						splitArray[1],
+						resourceConfiguration[configKey2])
+				}
 			}
 		}
 	}
@@ -394,6 +401,135 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
+	//Get requester machine ID from schema.dataresource
+	requestMachineID := d.Id()
+	//Get client handle
+	client := meta.(*APIClient)
+	//Fetch resource details from vRA
+	templateResources, errTemplate := client.GetResourceViews(requestMachineID)
+	if errTemplate != nil {
+		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+	}
+
+	//Read terraform resource > resource_configuration
+	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+
+	reconfigGetLinkTitle := "GET Template: " +
+		"{com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Reconfigure}"
+
+	//Read vRA resource content one by one
+	for item := range templateResources.Content {
+		mapData := templateResources.Content[item].(map[string]interface{})
+		childData := mapData["data"].(map[string]interface{})
+		childLinks := mapData["links"].([]interface{})
+		//If component is not empty
+		//Check if content object is child or not
+		if childData["Component"] != nil {
+			componentName := childData["Component"].(string)
+			var reconfigGetLink string
+			//Iterate over the links present in content elements
+			//Get resource child reconfiguration link
+			for link := range childLinks {
+				linkInterface := childLinks[link].(map[string]interface{})
+				if linkInterface["rel"] == reconfigGetLinkTitle {
+					//Get resource reconfiguration template link
+					reconfigGetLink = linkInterface["href"].(string)
+				}
+			}
+			resourceAction := new(ResourceActionTemplate)
+			apiError := new(APIError)
+			//Get resource child reconfiguration template json
+			response, err := client.HTTPClient.New().Get(reconfigGetLink).
+				Receive(resourceAction, apiError)
+			response.Close = true
+
+			if !apiError.isEmpty() {
+				return apiError
+			}
+			if err != nil {
+				return err
+			}
+
+			//Iterate over TF resource > resource_configuration
+			for configKey := range resourceConfiguration {
+				//Check if any TF resource > resource_configuration is empty or null
+				if resourceConfiguration[configKey] == nil || resourceConfiguration[configKey] == "" {
+					//Compare vRA child resource and TF resource > resource_configuration names
+					if strings.Contains(configKey, componentName+".") {
+						list1 := strings.Split(configKey, componentName+".")
+						//Read field value from vRA child resource
+						returnValue := getTemplateValue(resourceAction.Data, list1[1])
+						//Check if value returned from getTemplateValue is not nil
+						if returnValue != nil {
+							//If value returned from getTemplateValue is in float64 format then
+							//convert it in string format
+							if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
+								strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
+								resourceConfiguration[configKey] = strValue
+								errSet := d.Set("resource_configuration", resourceConfiguration)
+								//If set resource_configuration throws any error then return the same
+								if errSet != nil {
+									return errSet
+								}
+							} else {
+								//If value type is string then set it as it is
+								resourceConfiguration[configKey] = returnValue
+								errSet := d.Set("resource_configuration", resourceConfiguration)
+								if errSet != nil {
+									//If set resource_configuration throws any error then return the same
+									return errSet
+								}
+							}
+						} else {
+							returnValue := getTemplateValue(mapData, list1[1])
+							if returnValue != nil {
+								if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
+									strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
+									resourceConfiguration[configKey] = strValue
+									errSet := d.Set("resource_configuration", resourceConfiguration)
+									if errSet != nil {
+										//If set resource_configuration throws any error then return the same
+										return errSet
+									}
+								} else {
+									resourceConfiguration[configKey] = returnValue
+									errSet := d.Set("resource_configuration", resourceConfiguration)
+									if errSet != nil {
+										//If set resource_configuration throws any error then return the same
+										return errSet
+									}
+								}
+							}
+						}
+					}
+
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func getTemplateValue(templateInterface map[string]interface{}, field string) interface{} {
+	//Iterate over the map to get field provided as an argument
+	for i := range templateInterface {
+		//If value type is map then set recursive call which will fiend field in one level down of map interface
+		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map {
+			template, _ := templateInterface[i].(map[string]interface{})
+			returnValue := getTemplateValue(template, field)
+			if returnValue != nil {
+				return returnValue
+			}
+		} else if i == field {
+			//If value type is not map then compare field name with provided field name
+			//If both matches then update field value with provided value
+			return templateInterface[i]
+		}
+	}
+	return nil
+}
+
 //Function use - To read configuration of centOS 6.3 machine present in state file
 //Terraform call - terraform refresh
 func readResource(d *schema.ResourceData, meta interface{}) error {
@@ -415,6 +551,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
 	}
+	fetchError := fetchResourceFieldsValues(d, meta)
+	if fetchError != nil {
+		return fetchError
+	}
+
 	return nil
 }
 
@@ -545,6 +686,7 @@ func (c *APIClient) GetRequestStatus(ResourceID string) (*RequestStatusView, err
 	if !apiError.isEmpty() {
 		return nil, apiError
 	}
+
 	return RequestStatusViewTemplate, nil
 }
 
@@ -577,7 +719,6 @@ func (c *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachi
 
 	jsonBody, jErr := json.Marshal(template)
 	if jErr != nil {
-		log.Printf("Error marshalling template as JSON")
 		return nil, jErr
 	} else {
 		log.Printf("JSON Request Info: %s", jsonBody)
