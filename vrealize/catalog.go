@@ -39,7 +39,7 @@ func (c *APIClient) GetCatalogItem(uuid string) (*CatalogItemTemplate, error) {
 
 	template := new(CatalogItemTemplate)
 	apiError := new(APIError)
-	//Set REST call to get catalog item template
+	//Make a REST call to get catalog item template
 	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if err != nil {
@@ -60,20 +60,20 @@ type entitledCatalogItemViews struct {
 	Metadata Metadata    `json:"metadata"`
 }
 
-//Metadata - Metadata  used to store metadata of resource list response
+// Metadata - Metadata  used to store metadata of resource list response
 type Metadata struct {
 	TotalElements int `json:"totalElements"`
 }
 
-//readCatalogNameById - To read name of catalog from vRA using catalog_name
-func (c *APIClient) readCatalogNameByID(catalogItemID string) (interface{}, error) {
+// readCatalogItemNameByID - This function returns the catalog item name using catalog item ID
+func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (interface{}, error) {
 	//Form a path to read catalog template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s", catalogItemID)
 
 	template := new(CatalogItem)
 	apiError := new(APIError)
-	//Set REST call to get catalog template
+	//Make a REST call to get catalog template
 	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if err != nil {
@@ -87,8 +87,8 @@ func (c *APIClient) readCatalogNameByID(catalogItemID string) (interface{}, erro
 	return template.CatalogItem.Name, nil
 }
 
-//readCatalogIdByName - To read id of catalog from vRA using catalog_name
-func (c *APIClient) readCatalogIDByName(catalogName string) (interface{}, error) {
+//readCatalogItemIdByName - To read id of catalog from vRA using catalog_name
+func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, error) {
 	var catalogItemID string
 
 	log.Printf("readCatalogItemIdByName->catalog_name %v\n", catalogName)
@@ -141,8 +141,8 @@ func (c *APIClient) readCatalogIDByName(catalogName string) (interface{}, error)
 		}
 	}
 
-	//If multiple catalogs are present with provided catalog_name
-	// then raise an error and show all names of catalogs with similar name
+	// If multiple catalog items are present with provided catalog_name
+	// then raise an error and show all names of catalog items with similar name
 	if len(catalogItemNameArray) > 0 {
 		for index := range catalogItemNameArray {
 			catalogItemNameArray[index] = strconv.Itoa(index+1) + " " + catalogItemNameArray[index]

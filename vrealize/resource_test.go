@@ -46,8 +46,11 @@ func TestClient_Authenticate(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZXJuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
+		httpmock.NewStringResponder(200, `{
+		  "expires": "2017-07-25T15:18:49.000Z",
+		  "id": "MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZXJuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=",
+		  "tenant": "vsphere.local"
+		}`))
 
 	err := client.Authenticate()
 
@@ -56,7 +59,17 @@ func TestClient_Authenticate(t *testing.T) {
 	}
 
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
+		httpmock.NewErrorResponder(errors.New(`{
+		  "errors": [
+			{
+			  "code": 90135,
+			  "source": null,
+			  "message": "Unable to authenticate user jason@corp.local1 in tenant vsphere.local.",
+			  "systemMessage": "90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.",
+			  "moreInfoUrl": null
+			}
+		  ]
+		}`)))
 
 	err = client.Authenticate()
 

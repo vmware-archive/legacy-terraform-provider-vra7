@@ -100,7 +100,7 @@ func ResourceMachine() *schema.Resource {
 	}
 }
 
-//set_resource_schema - This function is used to update the catalog template/blueprint
+//set_resource_schema - This function is used to update the catalog item template/blueprint
 //and replace the values with user defined values added in .tf file.
 func setResourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
@@ -204,34 +204,34 @@ func addTemplateValue(templateInterface map[string]interface{}, field string, va
 	return templateInterface
 }
 
-//Function use - to set a create resource call
-//Terraform call - terraform apply
+//  Function use - to set a create resource call
+// Terraform call - terraform apply
 func createResource(d *schema.ResourceData, meta interface{}) error {
-	//Log file handler to generate logs for debugging purpose
-	//Get client handle
+	// Log file handler to generate logs for debugging purpose
+	// Get client handle
 	client := meta.(*APIClient)
 
-	//If catalog_name and catalog_id both not provided then throw an error
+	// If catalog_name and catalog_id both not provided then throw an error
 	if len(d.Get("catalog_name").(string)) <= 0 && len(d.Get("catalog_id").(string)) <= 0 {
 		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
 	}
 
-	//If catalog name is provided then get catalog ID using name for further process
-	//else if catalog id is provided then fetch catalog name
+	// If catalog item name is provided then get catalog item ID using name for further process
+	// else if catalog item id is provided then fetch catalog name
 	if len(d.Get("catalog_name").(string)) > 0 {
-		catalogItemID, returnErr := client.readCatalogIDByName(d.Get("catalog_name").(string))
+		catalogItemID, returnErr := client.readCatalogItemIDByName(d.Get("catalog_name").(string))
 		log.Printf("createResource->catalog_id %v\n", catalogItemID)
 		if returnErr != nil {
 			return fmt.Errorf("%v", returnErr)
 		}
 		if catalogItemID == nil {
-			return fmt.Errorf("No catalog found with name %v", d.Get("catalog_name").(string))
+			return fmt.Errorf("No catalog item found with name %v", d.Get("catalog_name").(string))
 		} else if catalogItemID == "" {
-			return fmt.Errorf("No catalog found with name %v", d.Get("catalog_name").(string))
+			return fmt.Errorf("No catalog item found with name %v", d.Get("catalog_name").(string))
 		}
 		d.Set("catalog_id", catalogItemID.(string))
 	} else if len(d.Get("catalog_id").(string)) > 0 {
-		CatalogItemName, nameError := client.readCatalogNameByID(d.Get("catalog_id").(string))
+		CatalogItemName, nameError := client.readCatalogItemNameByID(d.Get("catalog_id").(string))
 		if nameError != nil {
 			return fmt.Errorf("%v", nameError)
 		}
@@ -239,7 +239,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			d.Set("catalog_name", CatalogItemName.(string))
 		}
 	}
-	//Get catalog blueprint
+	//Get catalog item blueprint
 	templateCatalogItem, err := client.GetCatalogItem(d.Get("catalog_id").(string))
 	log.Printf("createResource->templateCatalogItem %v\n", templateCatalogItem)
 
@@ -340,7 +340,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Log print of template after values updated
 	log.Printf("Updated template - %v\n", templateCatalogItem.Data)
 
-	//Through an exception if there is any error while getting catalog template
+	//Through an exception if there is any error while getting catalog item template
 	if err != nil {
 		return fmt.Errorf("Invalid CatalogItem ID %v", err)
 	}

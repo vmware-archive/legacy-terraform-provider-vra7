@@ -9,6 +9,7 @@ import (
 
 func init() {
 	fmt.Println("init")
+	// These are mock test credentials
 	client = NewClient(
 		"admin@myvra.local",
 		"pass!@#",
@@ -69,7 +70,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		httpmock.NewStringResponder(200, entitledCatalogItemViewsResp))
 
 	//Fetch catalog Item by correct and exact name
-	catalogItemID, err := client.readCatalogIDByName("CentOS 6.3 - IPAM EXT")
+	catalogItemID, err := client.readCatalogItemIDByName("CentOS 6.3 - IPAM EXT")
 
 	if err != nil {
 		t.Errorf("Error while fetching catalog Item %v", err)
@@ -79,8 +80,10 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Catalog ID is nil")
 	}
 
-	//Fetch catalog by correct and false name
-	catalogItemID, err = client.readCatalogIDByName("Cent OS 6.3")
+	// Fetch catalog by false name
+	// The name is not present in catalog item list
+	// This should through an error and return an empty catalogItemID value
+	catalogItemID, err = client.readCatalogItemIDByName("Cent OS 6.3")
 
 	if catalogItemID != nil && catalogItemID != "" {
 		t.Errorf("Catalog Item ID is not nil")
@@ -90,8 +93,10 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Error while fetching catalog item %v", err)
 	}
 
-	//Fetch catalog item by correct and incomplete name
-	catalogItemID, err = client.readCatalogIDByName("CentOS")
+	// Fetch catalog item by correct and incomplete name
+	// The name provided (CentOS) to the readCatalogItemIDByName() is substring of correct name (CentOS_6.3)
+	// This should return empty catalogItemID with suggestions with full name
+	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
 	if catalogItemID != nil && catalogItemID != "" {
 		t.Errorf("Catalog Item ID is not nil")
@@ -105,8 +110,10 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItemViews",
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsResp))
 
-	//Fetch catalog item by correct and incomplete name
-	catalogItemID, err = client.readCatalogIDByName("CentOS")
+	// Fetch catalog item by correct and incomplete name
+	// The name provided (CentOS) to the readCatalogItemIDByName() is substring of correct name (CentOS_6.3)
+	// This should return empty catalogItemID with suggestions with full name
+	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
 	if catalogItemID != nil {
 		t.Errorf("Catalog Item ID is not nil")
@@ -117,7 +124,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	}
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItemViews",
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
-	catalogItemID, err = client.readCatalogIDByName("CentOS")
+	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")
@@ -134,7 +141,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItemViews?page=1&limit=44",
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
 
-	catalogItemID, err = client.readCatalogIDByName("CentOS")
+	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog item ID")
@@ -148,16 +155,21 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		httpmock.NewErrorResponder(errors.New(catalogItemViewsErrorResp)))
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItemViews",
 		httpmock.NewStringResponder(500, entitledCatalogItemViewsErrorResp))
-	catalogItemID, err = client.readCatalogIDByName("CentOS")
+	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 }
 
+
+// This unit test function contains test cases related to catalog ID in tf config files
+// Scenarios :
+// 1) Fetch catalog item details using correct catalog item ID
+// 2) Fetch catalog item details with invalid catalog item ID
 func TestFetchCatalogItemByID(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
 		httpmock.NewStringResponder(200, catalogItemTemplateResp))
 
-	catalogItemName, err := client.readCatalogNameByID(catalogItemId1)
+	catalogItemName, err := client.readCatalogItemNameByID(catalogItemId1)
 
 	if err != nil {
 		t.Errorf("Error while fetching catalog item %v", err)
@@ -170,7 +182,7 @@ func TestFetchCatalogItemByID(t *testing.T) {
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
 
-	catalogItemName, err = client.readCatalogNameByID(catalogItemId2)
+	catalogItemName, err = client.readCatalogItemNameByID(catalogItemId2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")
@@ -182,7 +194,7 @@ func TestFetchCatalogItemByID(t *testing.T) {
 
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId2,
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
-	catalogItemName, err = client.readCatalogNameByID(catalogItemId2)
+	catalogItemName, err = client.readCatalogItemNameByID(catalogItemId2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")
