@@ -86,7 +86,8 @@ func (c *APIClient) Authenticate() error {
 		log.Printf("%s\n", apiError.Error())
 		return fmt.Errorf("%s", apiError.Error())
 	}
-	//Get a brearer token
+
+	//Get a bearer token
 	c.BearerToken = authRes.ID
 	//Set bearer token
 	c.HTTPClient = c.HTTPClient.New().Set("Authorization",
