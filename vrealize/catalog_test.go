@@ -80,9 +80,9 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Catalog ID is nil")
 	}
 
-	// Fetch catalog by false name
+	// Fetch catalog item by false name
 	// The name is not present in catalog item list
-	// This should through an error and return an empty catalogItemID value
+	// This should return an error
 	catalogItemID, err = client.readCatalogItemIDByName("Cent OS 6.3")
 
 	if catalogItemID != nil && catalogItemID != "" {

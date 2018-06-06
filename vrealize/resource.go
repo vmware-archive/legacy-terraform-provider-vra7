@@ -211,7 +211,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// Get client handle
 	client := meta.(*APIClient)
 
-	// If catalog_name and catalog_id both not provided then throw an error
+	// If catalog_name and catalog_id both not provided then return an error
 	if len(d.Get("catalog_name").(string)) <= 0 && len(d.Get("catalog_id").(string)) <= 0 {
 		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
 	}
@@ -340,7 +340,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Log print of template after values updated
 	log.Printf("Updated template - %v\n", templateCatalogItem.Data)
 
-	//Through an exception if there is any error while getting catalog item template
+	//Return an exception if there is any error while getting catalog item template
 	if err != nil {
 		return fmt.Errorf("Invalid CatalogItem ID %v", err)
 	}
