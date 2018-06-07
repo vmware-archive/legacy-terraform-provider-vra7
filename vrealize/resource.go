@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"os"
 )
 
 //ResourceActionTemplate - is used to store information
