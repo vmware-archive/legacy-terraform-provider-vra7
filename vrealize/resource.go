@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"os"
 )
 
 //ResourceActionTemplate - is used to store information
@@ -170,21 +171,43 @@ func setResourceSchema() map[string]*schema.Schema {
 
 //Function use - to create machine
 //Terraform call - terraform apply
+//func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
+//	var replaced bool
+//	//Iterate over the map to get field provided as an argument
+//	for k, v := range templateInterface {
+//		//If value type is map then set recursive call which will fiend field in one level down of map interface
+//		if reflect.ValueOf(v).Kind() == reflect.Map {
+//			template, _ := v.(map[string]interface{})
+//			v, replaced = changeTemplateValue(template, field, value)
+//			if replaced == true {
+//				return templateInterface, true
+//			}
+//		} else if k == field {
+//			//If value type is not map then compare field name with provided field name
+//			//If both matches then update field value with provided value
+//			v = value
+//			return templateInterface, true
+//		}
+//	}
+//	//Return updated map interface type
+//	return templateInterface, replaced
+//}
+
 func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
 	var replaced bool
 	//Iterate over the map to get field provided as an argument
-	for i := range templateInterface {
+	for key := range templateInterface {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
-		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map {
-			template, _ := templateInterface[i].(map[string]interface{})
-			templateInterface[i], replaced = changeTemplateValue(template, field, value)
+		if reflect.ValueOf(templateInterface[key]).Kind() == reflect.Map {
+			template, _ := templateInterface[key].(map[string]interface{})
+			templateInterface[key], replaced = changeTemplateValue(template, field, value)
 			if replaced == true {
 				return templateInterface, true
 			}
-		} else if i == field {
+		} else if key == field {
 			//If value type is not map then compare field name with provided field name
 			//If both matches then update field value with provided value
-			templateInterface[i] = value
+			templateInterface[key] = value
 			return templateInterface, true
 		}
 	}
@@ -196,10 +219,10 @@ func changeTemplateValue(templateInterface map[string]interface{}, field string,
 func addTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	//simplest case is adding a simple value. Leaving as a func in case there's a need to do more complicated additions later
 	//	templateInterface[data]
-	for i := range templateInterface {
-		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map && i == "data" {
-			template, _ := templateInterface[i].(map[string]interface{})
-			templateInterface[i] = addTemplateValue(template, field, value)
+	for k, v := range templateInterface {
+		if reflect.ValueOf(v).Kind() == reflect.Map && k == "data" {
+			template, _ := v.(map[string]interface{})
+			v = addTemplateValue(template, field, value)
 		} else { //if i == "data" {
 			templateInterface[field] = value
 		}
@@ -214,7 +237,7 @@ func addTemplateValue(templateInterface map[string]interface{}, field string, va
 func createResource(d *schema.ResourceData, meta interface{}) error {
 	// Log file handler to generate logs for debugging purpose
 	// Get client handle
-	client := meta.(*APIClient)
+	vRAClient := meta.(*APIClient)
 
 	// If catalog_name and catalog_id both not provided then return an error
 	if len(d.Get("catalog_name").(string)) <= 0 && len(d.Get("catalog_id").(string)) <= 0 {
@@ -224,7 +247,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// If catalog item name is provided then get catalog item ID using name for further process
 	// else if catalog item id is provided then fetch catalog name
 	if len(d.Get("catalog_name").(string)) > 0 {
-		catalogItemID, returnErr := client.readCatalogItemIDByName(d.Get("catalog_name").(string))
+		catalogItemID, returnErr := vRAClient.readCatalogItemIDByName(d.Get("catalog_name").(string))
 		log.Printf("createResource->catalog_id %v\n", catalogItemID)
 		if returnErr != nil {
 			return fmt.Errorf("%v", returnErr)
@@ -236,7 +259,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		}
 		d.Set("catalog_id", catalogItemID.(string))
 	} else if len(d.Get("catalog_id").(string)) > 0 {
-		CatalogItemName, nameError := client.readCatalogItemNameByID(d.Get("catalog_id").(string))
+		CatalogItemName, nameError := vRAClient.readCatalogItemNameByID(d.Get("catalog_id").(string))
 		if nameError != nil {
 			return fmt.Errorf("%v", nameError)
 		}
@@ -245,7 +268,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 	//Get catalog item blueprint
-	templateCatalogItem, err := client.GetCatalogItem(d.Get("catalog_id").(string))
+	templateCatalogItem, err := vRAClient.GetCatalogItem(d.Get("catalog_id").(string))
 	log.Printf("createResource->templateCatalogItem %v\n", templateCatalogItem)
 
 	catalogConfiguration, _ := d.Get("catalog_configuration").(map[string]interface{})
@@ -284,21 +307,21 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
-	for configKey := range resourceConfiguration {
-		for dataKey := range keyList {
+	for configKey, configValue := range resourceConfiguration {
+		for dataKey, dataValue := range keyList {
 			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-			if strings.HasPrefix(configKey, keyList[dataKey]) {
+			if strings.HasPrefix(configKey, dataValue) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
+				splitedArray := strings.SplitN(configKey, dataValue+".", 2)
 				if len(splitedArray) != 2 {
 					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, keyList[dataKey]+".")
 				}
 				//Function call which changes the template field values with  user values
-				templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
-					templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
+				templateCatalogItem.Data[dataValue], replaced = changeTemplateValue(
+					templateCatalogItem.Data[dataValue].(map[string]interface{}),
 					splitedArray[1],
-					resourceConfiguration[configKey])
+					configValue)
 				if replaced {
 					usedConfigKeys = append(usedConfigKeys, configKey)
 				} else {
@@ -314,32 +337,32 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		delete(resourceConfiguration, usedConfigKeys[usedKey])
 	}
 	log.Println("Entering Add Loop")
-	for configKey2 := range resourceConfiguration {
-		for dataKey := range keyList {
-			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
-			if strings.HasPrefix(configKey2, keyList[dataKey]) {
-				splitArray := strings.Split(configKey2, keyList[dataKey]+".")
+	for configKey2, configValue2 := range resourceConfiguration {
+		for dataKey, dataValue := range keyList {
+			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, dataValue)
+			if strings.HasPrefix(configKey2, dataValue) {
+				splitArray := strings.Split(configKey2, dataValue+".")
 				log.Printf("Add Loop Contains %+v", splitArray[1])
-				resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
+				resourceItem := templateCatalogItem.Data[dataValue].(map[string]interface{})
 				resourceItem = addTemplateValue(
 					resourceItem["data"].(map[string]interface{}),
 					splitArray[1],
-					resourceConfiguration[configKey2])
+					configValue2)
 			}
 		}
 	}
 	//update template with deployment level config
 	// limit to description and reasons as other things could get us into trouble
 	deploymentConfiguration, _ := d.Get("deployment_configuration").(map[string]interface{})
-	for depField := range deploymentConfiguration {
+	for depField, depValue := range deploymentConfiguration {
 		fieldstr := fmt.Sprintf("%s", depField)
 		switch fieldstr {
 		case "description":
-			templateCatalogItem.Description = deploymentConfiguration[depField].(string)
+			templateCatalogItem.Description = depValue.(string)
 		case "reasons":
-			templateCatalogItem.Reasons = deploymentConfiguration[depField].(string)
+			templateCatalogItem.Reasons = depValue.(string)
 		default:
-			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, deploymentConfiguration[depField])
+			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
 		}
 	}
 	//Log print of template after values updated
@@ -351,7 +374,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//Set a  create machine function call
-	requestMachine, err := client.RequestMachine(templateCatalogItem)
+	requestMachine, err := vRAClient.RequestMachine(templateCatalogItem)
 
 	//Check if error got while create machine call
 	//If Error is occured, through an exception with an error message
@@ -395,6 +418,20 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel string) (string) {
+	var actionLink string
+	for _, linkData := range resourceSpecificLinks {
+		linkInterface := linkData.(map[string]interface{})
+		if linkInterface["rel"] == reconfigGetLinkTitleRel {
+			//Get resource reconfiguration template link
+			actionLink = linkInterface["href"].(string)
+			break
+		}
+	}
+	return actionLink
+}
+
+
 // Terraform call - terraform apply
 // This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
 // The update is performed on the Deployment using supported (day-2) actions.
@@ -402,12 +439,12 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	//Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 	//Get client handle
-	client := meta.(*APIClient)
+	vRAClient := meta.(*APIClient)
 
 	//If any change made in resource_configuration.
 	if d.HasChange("resource_configuration") {
 		//Read resource template
-		GetDeploymentStateData, errTemplate := client.GetDeploymentState(catalogItemRequestID)
+		GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if errTemplate != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 		}
@@ -420,34 +457,20 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 
 		//Iterate over the resources in the deployment
-		for item := range GetDeploymentStateData.Content {
-			resourceMap := GetDeploymentStateData.Content[item].(map[string]interface{})
+		for _, value := range GetDeploymentStateData.Content {
+			resourceMap := value.(map[string]interface{})
 			if resourceMap["resourceType"] == "Infrastructure.Virtual" {
 				resourceSpecificData := resourceMap["data"].(map[string]interface{})
 				resourceSpecificLinks := resourceMap["links"].([]interface{})
 				componentName := resourceSpecificData["Component"].(string)
-				var reconfigGetLink string
-				var reconfigPostLink string
-				//Iterate over the links present in content elements
-				for link := range resourceSpecificLinks {
-					linkInterface := resourceSpecificLinks[link].(map[string]interface{})
-					if linkInterface["rel"] == reconfigGetLinkTitleRel {
-						//Get resource reconfiguration template link
-						reconfigGetLink = linkInterface["href"].(string)
-					} else if linkInterface["rel"] == reconfigPostLinkTitleRel {
-						//Get resourcce reconfiguration request post link
-						reconfigPostLink = linkInterface["href"].(string)
-					}
-					if reconfigPostLink != "" && reconfigGetLink != "" {
-						//If both links are found then get out of the loop
-						break
-					}
-				}
+
+				reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
+				reconfigPostLink := readActionLink(resourceSpecificLinks, reconfigPostLinkTitleRel)
 
 				resourceAction := new(ResourceActionTemplate)
 				apiError := new(APIError)
 				//Get reource child reconfiguration template json
-				response, err := client.HTTPClient.New().Get(reconfigGetLink).
+				response, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).
 					Receive(resourceAction, apiError)
 				response.Close = true
 
@@ -458,19 +481,23 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					return err
 				}
 				configChanged := false
+				returnFlag := false
 				for configKey := range resourceConfiguration {
 					//compare resource list (resource_name) with user configuration fields
 					if strings.HasPrefix(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
 						// then split user configuration key into resource_name and field_name
-						splitedArray := strings.Split(configKey, componentName+".")
+						nameList := strings.Split(configKey, componentName+".")
 						//actionResponseInterface := actionResponse.(map[string]interface{})
 						//Function call which changes the template field values with  user values
 						//Replace existing values with new values in resource child template
-						resourceAction.Data, configChanged = changeTemplateValue(
+						resourceAction.Data, returnFlag = changeTemplateValue(
 							resourceAction.Data,
-							splitedArray[1],
+							nameList[1],
 							resourceConfiguration[configKey])
+						if returnFlag == true {
+							configChanged = true
+						}
 
 					}
 					//delete used user configuration
@@ -478,25 +505,36 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				//If template value got changed then set post call and update resource child
 				if configChanged != false {
-					resourceAction2 := new(ResourceActionTemplate)
-					apiError2 := new(APIError)
-					response2, _ := client.HTTPClient.New().Post(reconfigPostLink).
-						BodyJSON(resourceAction).Receive(resourceAction2, apiError2)
-
-					if response2.StatusCode != 201 {
-						oldData, _ := d.GetChange("resource_configuration")
-						d.Set("resource_configuration", oldData)
-						return apiError2
-					}
-					response2.Close = true
-					if !apiError2.isEmpty() {
-						oldData, _ := d.GetChange("resource_configuration")
-						d.Set("resource_configuration", oldData)
-						panic(d)
+					err := postResourceConfig(d, reconfigPostLink, resourceAction, meta)
+					if err != nil {
+						return err
 					}
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceAction *ResourceActionTemplate, meta interface{}) error {
+	vRAClient := meta.(*APIClient)
+	resourceAction2 := new(ResourceActionTemplate)
+	apiError2 := new(APIError)
+
+	response2, _ := vRAClient.HTTPClient.New().Post(reconfigPostLink).
+		BodyJSON(resourceAction).Receive(resourceAction2, apiError2)
+
+	if response2.StatusCode != 201 {
+		oldData, _ := d.GetChange("resource_configuration")
+		d.Set("resource_configuration", oldData)
+		return apiError2
+	}
+	response2.Close = true
+	if !apiError2.isEmpty() {
+		oldData, _ := d.GetChange("resource_configuration")
+		d.Set("resource_configuration", oldData)
+		return apiError2
+		//panic(d)
 	}
 	return nil
 }
@@ -508,9 +546,9 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 	//Get client handle
-	client := meta.(*APIClient)
+	vRAClient := meta.(*APIClient)
 	//Get requested status
-	resourceTemplate, errTemplate := client.GetRequestStatus(catalogItemRequestID)
+	resourceTemplate, errTemplate := vRAClient.GetRequestStatus(catalogItemRequestID)
 
 	//Raise an exception if error occured while fetching request status
 	if errTemplate != nil {
@@ -523,7 +561,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
 	}
 
-	GetDeploymentStateData, errTemplate := client.GetDeploymentState(catalogItemRequestID)
+	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
@@ -534,33 +572,16 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	var childConfig map[string]interface{}
 	childConfig = map[string]interface{}{}
 
-	for item := range GetDeploymentStateData.Content {
-		resourceMap := GetDeploymentStateData.Content[item].(map[string]interface{})
+	for _, value := range GetDeploymentStateData.Content {
+		resourceMap := value.(map[string]interface{})
 		resourceSpecificData := resourceMap["data"].(map[string]interface{})
 		resourceSpecificLinks := resourceMap["links"].([]interface{})
 		if resourceSpecificData["Component"] != nil {
 			componentName := resourceSpecificData["Component"].(string)
-			var reconfigGetLink string
-			for link := range resourceSpecificLinks {
-				linkInterface := resourceSpecificLinks[link].(map[string]interface{})
-				if linkInterface["rel"] == reconfigGetLinkTitleRel {
-					//Get resource reconfiguration template link
-					reconfigGetLink = linkInterface["href"].(string)
-					break
-				}
-			}
-			resourceAction := new(ResourceActionTemplate)
-			apiError := new(APIError)
-			//Get reource child reconfiguration template json
-			resp, err := client.HTTPClient.New().Get(reconfigGetLink).Receive(resourceAction, apiError)
-			resp.Close = true
-			if !apiError.isEmpty() {
-				return apiError
-			}
+			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
+
+			resourceAction,err := getResourceConfigTemplate(reconfigGetLink, meta)
 			if err != nil {
-				if err.Error() == "invalid character '<' looking for beginning of value" {
-					return fmt.Errorf("resource is not yet ready to show up")
-				}
 				return err
 			}
 			childConfig[componentName] = resourceAction.Data
@@ -580,6 +601,25 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	return nil
+}
+
+func getResourceConfigTemplate(reconfigGetLink string, meta interface{}) (*ResourceActionTemplate, error) {
+	vRAClient := meta.(*APIClient)
+	resourceAction := new(ResourceActionTemplate)
+	apiError := new(APIError)
+	//Get reource child reconfiguration template json
+	resp, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).Receive(resourceAction, apiError)
+	resp.Close = true
+	if !apiError.isEmpty() {
+		return nil, apiError
+	}
+	if err != nil {
+		if err.Error() == "invalid character '<' looking for beginning of value" {
+			return nil, fmt.Errorf("resource is not yet ready to show up")
+		}
+		return nil, err
+	}
+	return resourceAction, nil
 }
 
 // updateResourceConfigurationMap - updates the tf resource > resource_configuration type interface with given values
@@ -622,18 +662,18 @@ func updateResourceConfigurationMap(
 
 //getTemplateFieldValue is use to check and return value of argument key
 func getTemplateFieldValue(template map[string]interface{}, key string) interface{} {
-	for i := range template {
+	for k, v := range template {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
-		if reflect.ValueOf(template[i]).Kind() == reflect.Map {
-			template, _ := template[i].(map[string]interface{})
+		if reflect.ValueOf(v).Kind() == reflect.Map {
+			template, _ := v.(map[string]interface{})
 			resp := getTemplateFieldValue(template, key)
 			if resp != nil {
 				return resp
 			}
-		} else if i == key {
+		} else if k == key {
 			//If value type is not map then compare field name with provided field name
 			//If both matches then update field value with provided value
-			return template[i]
+			return v
 		}
 	}
 
@@ -646,7 +686,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
 	//Get client handle
-	client := meta.(*APIClient)
+	vRAClient := meta.(*APIClient)
 
 	//Through an error if request ID has no value or empty value
 	if len(d.Id()) == 0 {
@@ -662,7 +702,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 
 	}
 	//Fetch machine template
-	GetDeploymentStateData, errTemplate := client.GetDeploymentState(catalogItemRequestID)
+	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
 
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
@@ -670,7 +710,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Set a delete machine template function call.
 	//Which will fetch and return the delete machine template from the given template
-	DestroyMachineTemplate, resourceTemplate, errDestroyAction := client.GetDestroyActionTemplate(GetDeploymentStateData)
+	DestroyMachineTemplate, resourceTemplate, errDestroyAction := vRAClient.GetDestroyActionTemplate(GetDeploymentStateData)
 	if errDestroyAction != nil {
 		if errDestroyAction.Error() == "resource is not created or not found" {
 			d.SetId("")
@@ -681,7 +721,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//Set a destroy machine REST call
-	_, errDestroyMachine := client.DestroyMachine(DestroyMachineTemplate, resourceTemplate)
+	_, errDestroyMachine := vRAClient.DestroyMachine(DestroyMachineTemplate, resourceTemplate)
 	//Raise an exception if error got while deleting resource
 	if errDestroyMachine != nil {
 		return fmt.Errorf("Destory Machine machine operation failed: %v", errDestroyMachine)
@@ -692,7 +732,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 }
 
 //DestroyMachine - To set resource destroy call
-func (c *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
+func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
 	//Get a destroy template URL from given resource template
 	var destroyactionURL string
 	destroyactionURL = getactionURL(resourceViewTemplate, "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.destroy.name}")
@@ -705,7 +745,7 @@ func (c *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceView
 	apiError := new(APIError)
 
 	//Set a REST call with delete resource request and delete resource template as a data
-	resp, err := c.HTTPClient.New().Post(destroyactionURL).
+	resp, err := vRAClient.HTTPClient.New().Post(destroyactionURL).
 		BodyJSON(destroyTemplate).Receive(actionResponse, apiError)
 
 	if resp.StatusCode != 201 {
@@ -720,7 +760,7 @@ func (c *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceView
 }
 
 //PowerOffMachine - To set resource power-off call
-func (c *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
+func (vRAClient *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
 	//Get power-off resource URL from given template
 	var powerOffMachineactionURL string
 	powerOffMachineactionURL = getactionURL(resourceViewTemplate, "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.PowerOff}")
@@ -733,7 +773,7 @@ func (c *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceVi
 	apiError := new(APIError)
 
 	//Set a rest call to power-off the resource with resource power-off template as a data
-	response, err := c.HTTPClient.New().Post(powerOffMachineactionURL).
+	response, err := vRAClient.HTTPClient.New().Post(powerOffMachineactionURL).
 		BodyJSON(powerOffTemplate).Receive(actionResponse, apiError)
 
 	response.Close = true
@@ -754,13 +794,13 @@ func (c *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceVi
 
 //GetRequestStatus - To read request status of resource
 // which is used to show information to user post create call.
-func (c *APIClient) GetRequestStatus(ResourceID string) (*RequestStatusView, error) {
+func (vRAClient *APIClient) GetRequestStatus(ResourceID string) (*RequestStatusView, error) {
 	//Form a URL to read request status
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", ResourceID)
 	RequestStatusViewTemplate := new(RequestStatusView)
 	apiError := new(APIError)
 	//Set a REST call and fetch a resource request status
-	_, err := c.HTTPClient.New().Get(path).Receive(RequestStatusViewTemplate, apiError)
+	_, err := vRAClient.HTTPClient.New().Get(path).Receive(RequestStatusViewTemplate, apiError)
 	if err != nil {
 		return nil, err
 	}
@@ -771,14 +811,14 @@ func (c *APIClient) GetRequestStatus(ResourceID string) (*RequestStatusView, err
 }
 
 // GetDeploymentState - Read the state of a vRA7 Deployment
-func (c *APIClient) GetDeploymentState(CatalogRequestId string) (*ResourceView, error) {
+func (vRAClient *APIClient) GetDeploymentState(CatalogRequestId string) (*ResourceView, error) {
 	//Form an URL to fetch resource list view
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s"+
 		"/resourceViews", CatalogRequestId)
 	ResourceView := new(ResourceView)
 	apiError := new(APIError)
 	//Set a REST call to fetch resource view data
-	_, err := c.HTTPClient.New().Get(path).Receive(ResourceView, apiError)
+	_, err := vRAClient.HTTPClient.New().Get(path).Receive(ResourceView, apiError)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +829,7 @@ func (c *APIClient) GetDeploymentState(CatalogRequestId string) (*ResourceView, 
 }
 
 //RequestMachine - To set create resource REST call
-func (c *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachineResponse, error) {
+func (vRAClient *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachineResponse, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
 		"/requests", template.CatalogItemID)
@@ -805,7 +845,7 @@ func (c *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachi
 
 	log.Printf("JSON Request Info: %s", jsonBody)
 	//Set a REST call to create a machine
-	_, err := c.HTTPClient.New().Post(path).BodyJSON(template).
+	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(template).
 		Receive(requestMachineRes, apiError)
 
 	if err != nil {
