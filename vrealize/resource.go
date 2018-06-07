@@ -287,7 +287,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	for configKey := range resourceConfiguration {
 		for dataKey := range keyList {
 			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-			if strings.Contains(configKey, keyList[dataKey]) {
+			if strings.HasPrefix(configKey, keyList[dataKey]) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
 				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
@@ -317,7 +317,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	for configKey2 := range resourceConfiguration {
 		for dataKey := range keyList {
 			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, keyList[dataKey])
-			if strings.Contains(configKey2, keyList[dataKey]) {
+			if strings.HasPrefix(configKey2, keyList[dataKey]) {
 				splitArray := strings.Split(configKey2, keyList[dataKey]+".")
 				log.Printf("Add Loop Contains %+v", splitArray[1])
 				resourceItem := templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{})
@@ -570,7 +570,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	changed := false
 
-	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig, changed)
+	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig)
 
 	if changed {
 		setError := d.Set("resource_configuration", resourceConfiguration)
@@ -582,24 +582,33 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-//updateResourceConfigurationMap updates the resource_configuration schema map data
-//and returns boolean value for whether map got updated or not
-func updateResourceConfigurationMap(resourceConfiguration map[string]interface{}, childConfig map[string]interface{}, changed bool) (map[string]interface{}, bool) {
-	for index1 := range resourceConfiguration {
-		for index2 := range childConfig {
-			if strings.Contains(index1, index2+".") {
-				splitedArray := strings.Split(index1, index2+".")
-				currentValue := resourceConfiguration[index1]
-				updatedValue := getTemplateFieldValue(childConfig[index2].(map[string]interface{}), splitedArray[1])
+// updateResourceConfigurationMap - updates the tf resource > resource_configuration type interface with given values
+// Input:
+// resourceConfiguration map[string]interface{} : tf resource_configuration
+// childConfig map[string]interface{} : data of deployment VMs
+// Output:
+// resourceConfiguration : updated resource_configuration map[string]interface data
+// changed : boolean for data got changed or not
+func updateResourceConfigurationMap(
+	resourceConfiguration map[string]interface{}, vmData map[string]interface{}) (map[string]interface{}, bool) {
+	var changed bool
+	for configKey1, configValue1 := range resourceConfiguration {
+		for configKey2, configValue2 := range vmData {
+			if strings.HasPrefix(configKey1, configKey2+".") {
+				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
+				currentValue := configValue1
+				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
 				if updatedValue != currentValue {
 					if reflect.ValueOf(updatedValue).Kind() == reflect.Float64 {
-						resourceConfiguration[index1] = strconv.FormatFloat(updatedValue.(float64), 'f', 0, 64)
+						configValue1 =
+							strconv.FormatFloat(updatedValue.(float64), 'f', 0, 64)
 					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Float32 {
-						resourceConfiguration[index1] = strconv.FormatFloat(updatedValue.(float64), 'f', 0, 32)
+						configValue1 =
+							strconv.FormatFloat(updatedValue.(float64), 'f', 0, 32)
 					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Int {
-						resourceConfiguration[index1] = strconv.FormatInt(updatedValue.(int64), 10)
+						configValue1 = strconv.FormatInt(updatedValue.(int64), 10)
 					} else {
-						resourceConfiguration[index1] = updatedValue
+						configValue1 = updatedValue
 					}
 					changed = true
 				}
