@@ -430,6 +430,29 @@ func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel
 	return actionLink
 }
 
+func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) (map[string]interface{}) {
+
+	var urlMap map[string]interface{}
+	urlMap = map[string]interface{}{}
+	const reconfigGetLinkTitleRel = "GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
+		"machine.Reconfigure}"
+	const reconfigPostLinkTitleRel = "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
+		"machine.Reconfigure}"
+
+	for _, value := range GetDeploymentStateData.Content {
+		resourceMap := value.(map[string]interface{})
+		if resourceMap["resourceType"] == "Infrastructure.Virtual" {
+			resourceSpecificData := resourceMap["data"].(map[string]interface{})
+			resourceSpecificLinks := resourceMap["links"].([]interface{})
+			componentName := resourceSpecificData["Component"].(string)
+
+			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
+			reconfigPostLink := readActionLink(resourceSpecificLinks, reconfigPostLinkTitleRel)
+			urlMap[componentName] = []string{reconfigGetLink, reconfigPostLink}
+		}
+	}
+	return urlMap
+}
 
 // Terraform call - terraform apply
 // This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
@@ -454,22 +477,19 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			"machine.Reconfigure}"
 
 		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+		VMReconfigActionUrls := readVMReconfigActionUrls(GetDeploymentStateData)
 
 		//Iterate over the resources in the deployment
 		for _, value := range GetDeploymentStateData.Content {
 			resourceMap := value.(map[string]interface{})
 			if resourceMap["resourceType"] == "Infrastructure.Virtual" {
 				resourceSpecificData := resourceMap["data"].(map[string]interface{})
-				resourceSpecificLinks := resourceMap["links"].([]interface{})
+				//resourceSpecificLinks := resourceMap["links"].([]interface{})
 				componentName := resourceSpecificData["Component"].(string)
-
-				reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
-				reconfigPostLink := readActionLink(resourceSpecificLinks, reconfigPostLinkTitleRel)
-
 				resourceAction := new(ResourceActionTemplate)
 				apiError := new(APIError)
 				//Get reource child reconfiguration template json
-				response, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).
+				response, err := vRAClient.HTTPClient.New().Get(VMReconfigActionUrls[componentName].([]string)[0]).
 					Receive(resourceAction, apiError)
 				response.Close = true
 
@@ -504,7 +524,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				//If template value got changed then set post call and update resource child
 				if configChanged != false {
-					err := postResourceConfig(d, reconfigPostLink, resourceAction, meta)
+					err := postResourceConfig(
+						d,
+						VMReconfigActionUrls[componentName].([]string)[1],
+						resourceAction,
+						meta)
 					if err != nil {
 						return err
 					}
@@ -512,6 +536,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
+	readResource(d, meta)
 	return nil
 }
 
@@ -579,7 +604,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			componentName := resourceSpecificData["Component"].(string)
 			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
 
-			resourceAction,err := getResourceConfigTemplate(reconfigGetLink, meta)
+			resourceAction,err := getResourceConfigTemplate(reconfigGetLink, d, meta)
 			if err != nil {
 				return err
 			}
@@ -602,7 +627,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func getResourceConfigTemplate(reconfigGetLink string, meta interface{}) (*ResourceActionTemplate, error) {
+func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, meta interface{}) (*ResourceActionTemplate, error) {
 	vRAClient := meta.(*APIClient)
 	resourceAction := new(ResourceActionTemplate)
 	apiError := new(APIError)
@@ -614,6 +639,7 @@ func getResourceConfigTemplate(reconfigGetLink string, meta interface{}) (*Resou
 	}
 	if err != nil {
 		if err.Error() == "invalid character '<' looking for beginning of value" {
+			d.Set("request_status", "IN_PROGRESS")
 			return nil, fmt.Errorf("resource is not yet ready to show up")
 		}
 		return nil, err
