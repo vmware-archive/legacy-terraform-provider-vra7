@@ -467,6 +467,17 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	if errDestroyMachine != nil {
 		return fmt.Errorf("Destory Machine machine operation failed: %v", errDestroyMachine)
 	}
+	deleteFlag := false
+	for deleteFlag == false {
+		deploymentStateData, err := client.GetResourceViews(requestMachineID)
+		if err != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", err)
+		}
+		if len(deploymentStateData.Content) == 0 {
+			deleteFlag = true
+		}
+		time.Sleep(3e+10)
+	}
 	//If resource got deleted then unset the resource ID from state file
 	d.SetId("")
 	return nil
