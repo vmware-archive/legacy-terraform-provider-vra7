@@ -8,7 +8,6 @@ import (
 	"time"
 	"encoding/json"
 	"github.com/hashicorp/terraform/helper/schema"
-	"os"
 )
 
 //ResourceViewsTemplate - is used to store information
