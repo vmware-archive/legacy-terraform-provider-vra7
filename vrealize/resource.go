@@ -281,29 +281,30 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
-	for configKey := range resourceConfiguration {
-		if resourceConfiguration[configKey] != nil && resourceConfiguration[configKey] != "" {
-			for dataKey := range keyList {
-				//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-				if strings.Contains(configKey, keyList[dataKey]) {
-					//If user_configuration contains resource_list element
-					// then split user configuration key into resource_name and field_name
-					splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
-					if len(splitedArray) != 2 {
-						return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, keyList[dataKey]+".")
-					}
-					//Function call which changes the template field values with  user values
-					templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
-						templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
-						splitedArray[1],
-						resourceConfiguration[configKey])
-					if replaced {
-						usedConfigKeys = append(usedConfigKeys, configKey)
-					}
+	for configKey, configValue := range resourceConfiguration {
+		if len(configValue.(string)) == 0 {
+			break
+		}
+		for dataKey := range keyList {
+			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
+			if strings.Contains(configKey, keyList[dataKey]) {
+				//If user_configuration contains resource_list element
+				// then split user configuration key into resource_name and field_name
+				splitedArray := strings.SplitN(configKey, keyList[dataKey]+".", 2)
+				if len(splitedArray) != 2 {
+					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to " +
+						"start with %s\n", configKey, keyList[dataKey]+".")
+				}
+				//Function call which changes the template field values with  user values
+				templateCatalogItem.Data[keyList[dataKey]], replaced = changeTemplateValue(
+					templateCatalogItem.Data[keyList[dataKey]].(map[string]interface{}),
+					splitedArray[1],
+					resourceConfiguration[configKey])
+				if replaced {
+					usedConfigKeys = append(usedConfigKeys, configKey)
 				}
 			}
 		}
-
 	}
 
 	//Add remaining keys to template vs updating values
@@ -413,26 +414,27 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 	//Read terraform resource > resource_configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 
-	reconfigGetLinkTitle := "GET Template: " +
+	const reconfigGetLinkTitle = "GET Template: " +
 		"{com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Reconfigure}"
 
 	//Read vRA resource content one by one
-	for item := range templateResources.Content {
-		mapData := templateResources.Content[item].(map[string]interface{})
-		childData := mapData["data"].(map[string]interface{})
-		childLinks := mapData["links"].([]interface{})
+	for _,value := range templateResources.Content {
+		resourceMap := value.(map[string]interface{})
+		resourceSpecificData := resourceMap["data"].(map[string]interface{})
+		resourceSpecificLinks := resourceMap["links"].([]interface{})
 		//If component is not empty
 		//Check if content object is child or not
-		if childData["Component"] != nil {
-			componentName := childData["Component"].(string)
+		if resourceMap["resourceType"] == "Infrastructure.Virtual" {
+			componentName := resourceSpecificData["Component"].(string)
 			var reconfigGetLink string
 			//Iterate over the links present in content elements
 			//Get resource child reconfiguration link
-			for link := range childLinks {
-				linkInterface := childLinks[link].(map[string]interface{})
+			for link := range resourceSpecificLinks {
+				linkInterface := resourceSpecificLinks[link].(map[string]interface{})
 				if linkInterface["rel"] == reconfigGetLinkTitle {
 					//Get resource reconfiguration template link
 					reconfigGetLink = linkInterface["href"].(string)
+					break
 				}
 			}
 			resourceAction := new(ResourceActionTemplate)
@@ -450,63 +452,43 @@ func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
 			}
 
 			//Iterate over TF resource > resource_configuration
-			for configKey := range resourceConfiguration {
-				//Check if any TF resource > resource_configuration is empty or null
-				if resourceConfiguration[configKey] == nil || resourceConfiguration[configKey] == "" {
-					//Compare vRA child resource and TF resource > resource_configuration names
-					if strings.Contains(configKey, componentName+".") {
-						list1 := strings.Split(configKey, componentName+".")
-						//Read field value from vRA child resource
-						returnValue := getTemplateValue(resourceAction.Data, list1[1])
-						//Check if value returned from getTemplateValue is not nil
-						if returnValue != nil {
-							//If value returned from getTemplateValue is in float64 format then
-							//convert it in string format
-							if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
-								strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
-								resourceConfiguration[configKey] = strValue
-								errSet := d.Set("resource_configuration", resourceConfiguration)
-								//If set resource_configuration throws any error then return the same
-								if errSet != nil {
-									return errSet
-								}
-							} else {
-								//If value type is string then set it as it is
-								resourceConfiguration[configKey] = returnValue
-								errSet := d.Set("resource_configuration", resourceConfiguration)
-								if errSet != nil {
-									//If set resource_configuration throws any error then return the same
-									return errSet
-								}
-							}
-						} else {
-							returnValue := getTemplateValue(mapData, list1[1])
-							if returnValue != nil {
-								if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
-									strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
-									resourceConfiguration[configKey] = strValue
-									errSet := d.Set("resource_configuration", resourceConfiguration)
-									if errSet != nil {
-										//If set resource_configuration throws any error then return the same
-										return errSet
-									}
-								} else {
-									resourceConfiguration[configKey] = returnValue
-									errSet := d.Set("resource_configuration", resourceConfiguration)
-									if errSet != nil {
-										//If set resource_configuration throws any error then return the same
-										return errSet
-									}
-								}
-							}
-						}
+			for configKey, _ := range resourceConfiguration {
+				//Compare vRA child resource and TF resource > resource_configuration names
+				if strings.HasPrefix(configKey, componentName+".") {
+					nameList := strings.SplitN(configKey, componentName+".", 2)
+					//Read field value from vRA child resource
+					var returnValue interface{}
+					returnValue = getTemplateValue(resourceAction.Data, nameList[1])
+					//Check if value returned from getTemplateValue is not nil
+					if returnValue == nil {
+						returnValue = getTemplateValue(resourceMap, nameList[1])
 					}
-
+					resourceConfiguration = updateResourceConfigurationMap(returnValue, resourceConfiguration, configKey, d)
+					errSet := d.Set("resource_configuration", resourceConfiguration)
+					// If set resource_configuration throws any error then return the same
+					if errSet != nil {
+						return errSet
+					}
 				}
 			}
 		}
 	}
 	return nil
+}
+
+
+func updateResourceConfigurationMap(returnValue interface{}, resourceConfiguration map[string]interface{},
+	configKey string, d *schema.ResourceData) map[string]interface{} {
+	//If value returned from getTemplateValue is in float64 format then
+	//convert it in string format
+	if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
+		strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
+		resourceConfiguration[configKey] = strValue
+	} else {
+		//If value type is string then set it as it is
+		resourceConfiguration[configKey] = returnValue
+	}
+	return resourceConfiguration
 }
 
 func getTemplateValue(templateInterface map[string]interface{}, field string) interface{} {
