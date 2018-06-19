@@ -170,28 +170,6 @@ func setResourceSchema() map[string]*schema.Schema {
 
 //Function use - to create machine
 //Terraform call - terraform apply
-//func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
-//	var replaced bool
-//	//Iterate over the map to get field provided as an argument
-//	for k, v := range templateInterface {
-//		//If value type is map then set recursive call which will fiend field in one level down of map interface
-//		if reflect.ValueOf(v).Kind() == reflect.Map {
-//			template, _ := v.(map[string]interface{})
-//			v, replaced = changeTemplateValue(template, field, value)
-//			if replaced == true {
-//				return templateInterface, true
-//			}
-//		} else if k == field {
-//			//If value type is not map then compare field name with provided field name
-//			//If both matches then update field value with provided value
-//			v = value
-//			return templateInterface, true
-//		}
-//	}
-//	//Return updated map interface type
-//	return templateInterface, replaced
-//}
-
 func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
 	var replaced bool
 	//Iterate over the map to get field provided as an argument
@@ -312,14 +290,14 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			if strings.HasPrefix(configKey, dataValue) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-				splitedArray := strings.SplitN(configKey, dataValue+".", 2)
-				if len(splitedArray) != 2 {
+				propertyName := strings.TrimPrefix(configKey, dataValue+".")
+				if len(propertyName) == 0 {
 					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, keyList[dataKey]+".")
 				}
 				//Function call which changes the template field values with  user values
 				templateCatalogItem.Data[dataValue], replaced = changeTemplateValue(
 					templateCatalogItem.Data[dataValue].(map[string]interface{}),
-					splitedArray[1],
+					propertyName,
 					configValue)
 				if replaced {
 					usedConfigKeys = append(usedConfigKeys, configKey)
@@ -417,7 +395,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel string) (string) {
+func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel string) string {
 	var actionLink string
 	for _, linkData := range resourceSpecificLinks {
 		linkInterface := linkData.(map[string]interface{})
@@ -430,7 +408,7 @@ func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel
 	return actionLink
 }
 
-func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) (map[string]interface{}) {
+func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) map[string]interface{} {
 
 	var urlMap map[string]interface{}
 	urlMap = map[string]interface{}{}
@@ -470,11 +448,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		if errTemplate != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 		}
-		//Set URL relation variables.
-		const reconfigGetLinkTitleRel = "GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
-			"machine.Reconfigure}"
-		const reconfigPostLinkTitleRel = "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
-			"machine.Reconfigure}"
 
 		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 		VMReconfigActionUrls := readVMReconfigActionUrls(GetDeploymentStateData)
@@ -604,7 +577,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			componentName := resourceSpecificData["Component"].(string)
 			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
 
-			resourceAction,err := getResourceConfigTemplate(reconfigGetLink, d, meta)
+			resourceAction, err := getResourceConfigTemplate(reconfigGetLink, d, meta)
 			if err != nil {
 				return err
 			}
@@ -663,20 +636,8 @@ func updateResourceConfigurationMap(
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
 				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
-
 				if updatedValue != currentValue {
-					if reflect.ValueOf(updatedValue).Kind() == reflect.Float64 {
-						configValue1 =
-							strconv.FormatFloat(updatedValue.(float64), 'f', 0, 64)
-					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Float32 {
-						configValue1 =
-							strconv.FormatFloat(updatedValue.(float64), 'f', 0, 32)
-					} else if reflect.ValueOf(updatedValue).Kind() == reflect.Int {
-						configValue1 = strconv.FormatInt(updatedValue.(int64), 10)
-					} else {
-						configValue1 = updatedValue
-
-					}
+					configValue1 = updatedValue
 					changed = true
 				}
 			}
@@ -693,16 +654,32 @@ func getTemplateFieldValue(template map[string]interface{}, key string) interfac
 			template, _ := v.(map[string]interface{})
 			resp := getTemplateFieldValue(template, key)
 			if resp != nil {
-				return resp
+				return convertInterfaceToString(resp)
 			}
 		} else if k == key {
 			//If value type is not map then compare field name with provided field name
 			//If both matches then update field value with provided value
-			return v
+			return convertInterfaceToString(v)
 		}
 	}
 
 	return nil
+}
+
+func convertInterfaceToString(interfaceData interface{}) string {
+	var stringData string
+	if reflect.ValueOf(interfaceData).Kind() == reflect.Float64 {
+		stringData =
+			strconv.FormatFloat(interfaceData.(float64), 'f', 0, 64)
+	} else if reflect.ValueOf(interfaceData).Kind() == reflect.Float32 {
+		stringData =
+			strconv.FormatFloat(interfaceData.(float64), 'f', 0, 32)
+	} else if reflect.ValueOf(interfaceData).Kind() == reflect.Int {
+		stringData = strconv.FormatInt(interfaceData.(int64), 10)
+	} else {
+		stringData = interfaceData.(string)
+	}
+	return stringData
 }
 
 //Function use - To delete resources which are created by terraform and present in state file
