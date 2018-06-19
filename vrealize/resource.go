@@ -281,7 +281,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, componentName+".")
 				}
 				// Function call which changes the template field values with  user values
-				templateCatalogItem.Data[componentName] = addUpdateConfigTemplateMap(
+				templateCatalogItem.Data[componentName] = addOrUpdateConfigTemplateMap(
 					templateCatalogItem.Data[componentName].(map[string]interface{}),
 					configKeyParts[1],
 					configValue)
@@ -357,7 +357,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func addUpdateConfigTemplateMap(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
+func addOrUpdateConfigTemplateMap(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
 	var replaced bool
 	templateInterface, replaced = changeTemplateValue(
 		templateInterface,
