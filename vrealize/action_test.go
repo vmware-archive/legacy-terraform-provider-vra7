@@ -157,7 +157,7 @@ func TestPowerOffAction(t *testing.T) {
 			"resourceId":"4f58732f-62c7-4d38-a78b-b2cf34ee45df","actionId":"b37c071e-06ce-4842-b194-0f64a829908f","description":null,
 			"data":{}}`))
 
-	templateResources, errTemplate := client.GetResourceViews(catalogItemId)
+	templateResources, errTemplate := client.GetDeploymentState(catalogItemId)
 	if errTemplate != nil {
 		t.Errorf("Failed to get the template resources %v", errTemplate)
 	}
