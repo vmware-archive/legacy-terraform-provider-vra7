@@ -365,9 +365,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	d.Set("request_status", "SUBMITTED")
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
+	sleepFor := 30
+	for i := 0; i < waitTimeout/sleepFor; i++ {
+		time.Sleep(time.Duration(sleepFor)*time.Second)
 
-	for i := 0; i < waitTimeout/30; i++ {
-		time.Sleep(3e+10)
 		readResource(d, meta)
 
 		if d.Get("request_status") == "SUCCESSFUL" {
@@ -728,8 +729,26 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	if errDestroyMachine != nil {
 		return fmt.Errorf("Destory Machine machine operation failed: %v", errDestroyMachine)
 	}
-	//If resource got deleted then unset the resource ID from state file
-	d.SetId("")
+
+	waitTimeout := d.Get("wait_timeout").(int) * 60
+	sleepFor := 30
+	for i := 0; i < waitTimeout/sleepFor; i++ {
+		time.Sleep(time.Duration(sleepFor)*time.Second)
+
+		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
+		if err != nil {
+			return fmt.Errorf("Resource view failed to load:  %v", err)
+		}
+		if len(deploymentStateData.Content) == 0 {
+			//If resource got deleted then unset the resource ID from state file
+			d.SetId("")
+			break
+		}
+	}
+	if d.Id() != "" {
+		d.SetId("")
+		return fmt.Errorf("resource still being deleted after %v minutes", d.Get("wait_timeout"))
+	}
 	return nil
 }
 
