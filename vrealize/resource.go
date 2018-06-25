@@ -745,6 +745,9 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			break
 		}
 	}
+	if d.Id() != "" {
+		return fmt.Errorf("resource still being deleted after %v minutes", waitTimeout)
+	}
 	return nil
 }
 
