@@ -365,9 +365,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	d.Set("request_status", "SUBMITTED")
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
+	sleepFor := 30
+	for i := 0; i < waitTimeout/sleepFor; i++ {
+		time.Sleep(time.Duration(sleepFor)*time.Second)
 
-	for i := 0; i < waitTimeout/30; i++ {
-		time.Sleep(3e+10)
 		readResource(d, meta)
 
 		if d.Get("request_status") == "SUCCESSFUL" {
@@ -730,8 +731,10 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
-	for i := 0; i < waitTimeout/30; i++ {
-		time.Sleep(3e+10)
+	sleepFor := 30
+	for i := 0; i < waitTimeout/sleepFor; i++ {
+		time.Sleep(time.Duration(sleepFor)*time.Second)
+
 		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
