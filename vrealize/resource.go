@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sort"
 )
 
 //ResourceActionTemplate - is used to store information
@@ -259,75 +260,45 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		templateCatalogItem.BusinessGroupID = d.Get("businessgroup_id").(string)
 	}
 
-	//Get all resource keys from blueprint in array
-	var keyList []string
+	// Get all resource keys from blueprint in array
+	var componentNameList []string
 	for field := range templateCatalogItem.Data {
 		if reflect.ValueOf(templateCatalogItem.Data[field]).Kind() == reflect.Map {
-			keyList = append(keyList, field)
+			componentNameList = append(componentNameList, field)
 		}
 	}
-	log.Printf("createResource->key_list %v\n", keyList)
+	log.Printf("createResource->key_list %v\n", componentNameList)
 
-	//Arrange keys in descending order of text length
-	for field1 := range keyList {
-		for field2 := range keyList {
-			if len(keyList[field1]) > len(keyList[field2]) {
-				temp := keyList[field1]
-				keyList[field1], keyList[field2] = keyList[field2], temp
-			}
-		}
-	}
-
-	//array to keep track of resource values that have been used
-	var usedConfigKeys []string
-	var replaced bool
+	// Arrange keys in descending order of text length
+	// Sorting component name list is required because in the following condition
+	// 1. CentOS_6.3
+	// 2. CentOS_6.3.1
+	// So the case was updated happened for 2nd component instead of 1st.
+	// Hence, to make sure all is going fine, this block of code is added.
+	sort.Sort(byLength(componentNameList))
 
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	for configKey, configValue := range resourceConfiguration {
-		for dataKey, dataValue := range keyList {
+		for _, componentName := range componentNameList {
 			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-			if strings.HasPrefix(configKey, dataValue) {
+			if strings.HasPrefix(configKey, componentName) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-				propertyName := strings.TrimPrefix(configKey, dataValue+".")
+					propertyName := strings.TrimPrefix(configKey, componentName+".")
 				if len(propertyName) == 0 {
-					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, keyList[dataKey]+".")
+					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, componentName+".")
 				}
-				//Function call which changes the template field values with  user values
-				templateCatalogItem.Data[dataValue], replaced = changeTemplateValue(
-					templateCatalogItem.Data[dataValue].(map[string]interface{}),
+				// Function call which changes the template field values with  user values
+				templateCatalogItem.Data[componentName] = addOrUpdateConfigTemplateMap(
+					templateCatalogItem.Data[componentName].(map[string]interface{}),
 					propertyName,
 					configValue)
-				if replaced {
-					usedConfigKeys = append(usedConfigKeys, configKey)
-				} else {
-					log.Printf("%s was not replaced", configKey)
-				}
+				break
 			}
 		}
 	}
 
-	//Add remaining keys to template vs updating values
-	// first clean out used values
-	for usedKey := range usedConfigKeys {
-		delete(resourceConfiguration, usedConfigKeys[usedKey])
-	}
-	log.Println("Entering Add Loop")
-	for configKey2, configValue2 := range resourceConfiguration {
-		for dataKey, dataValue := range keyList {
-			log.Printf("Add Loop: configKey2=[%s] keyList[%d] =[%v]", configKey2, dataKey, dataValue)
-			if strings.HasPrefix(configKey2, dataValue) {
-				splitArray := strings.Split(configKey2, dataValue+".")
-				log.Printf("Add Loop Contains %+v", splitArray[1])
-				resourceItem := templateCatalogItem.Data[dataValue].(map[string]interface{})
-				resourceItem = addTemplateValue(
-					resourceItem["data"].(map[string]interface{}),
-					splitArray[1],
-					configValue2)
-			}
-		}
-	}
 	//update template with deployment level config
 	// limit to description and reasons as other things could get us into trouble
 	deploymentConfiguration, _ := d.Get("deployment_configuration").(map[string]interface{})
@@ -396,6 +367,18 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
+func addOrUpdateConfigTemplateMap(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
+	var replaced bool
+	templateInterface, replaced = changeTemplateValue(templateInterface, field, value)
+
+	if !replaced {
+		templateInterface = addTemplateValue(templateInterface["data"].(map[string]interface{}), field, value)
+	}
+	return templateInterface
+}
+
+//Function use - to update centOS 6.3 machine present in state file
+//Terraform call - terraform refresh
 func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel string) string {
 	var actionLink string
 	for _, linkData := range resourceSpecificLinks {
