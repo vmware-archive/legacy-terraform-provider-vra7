@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sort"
 )
 
 //ResourceActionTemplate - is used to store information
@@ -268,32 +269,30 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	log.Printf("createResource->key_list %v\n", componentNameList)
 
-	//Arrange keys in descending order of text length
-	for field1 := range componentNameList {
-		for field2 := range componentNameList {
-			if len(componentNameList[field1]) > len(componentNameList[field2]) {
-				temp := componentNameList[field1]
-				componentNameList[field1], componentNameList[field2] = componentNameList[field2], temp
-			}
-		}
-	}
+	// Arrange keys in descending order of text length
+	// Sorting component name list is required because in the following condition
+	// 1. CentOS_6.3
+	// 2. CentOS_6.3.1
+	// So the case was updated happened for 2nd component instead of 1st.
+	// Hence, to make sure all is going fine, this block of code is added.
+	sort.Sort(byLength(componentNameList))
 
 	//Update template field values with user configuration
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	for configKey, configValue := range resourceConfiguration {
 		for _, componentName := range componentNameList {
 			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
-			if strings.Contains(configKey, componentName) {
-				//If resource_configuration contains resource_list element
-				// then split resource_configuration keys into component_name and property_name
-				configKeyParts := strings.SplitN(configKey, componentName+".", 2)
-				if len(configKeyParts) != 2 {
-					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s\n", configKey, componentName+".")
+			if strings.HasPrefix(configKey, componentName) {
+				//If user_configuration contains resource_list element
+				// then split user configuration key into resource_name and field_name
+					propertyName := strings.TrimPrefix(configKey, componentName+".")
+				if len(propertyName) == 0 {
+					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, componentName+".")
 				}
 				// Function call which changes the template field values with  user values
 				templateCatalogItem.Data[componentName] = addOrUpdateConfigTemplateMap(
 					templateCatalogItem.Data[componentName].(map[string]interface{}),
-					configKeyParts[1],
+					propertyName,
 					configValue)
 				break
 			}
@@ -369,18 +368,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 func addOrUpdateConfigTemplateMap(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
 	var replaced bool
-	templateInterface, replaced = changeTemplateValue(
-		templateInterface,
-		field,
-		value)
+	templateInterface, replaced = changeTemplateValue(templateInterface, field, value)
 
 	if !replaced {
-		templateInterface = addTemplateValue(
-			templateInterface["data"].(map[string]interface{}),
-			field,
-			value)
+		templateInterface = addTemplateValue(templateInterface["data"].(map[string]interface{}), field, value)
 	}
-
 	return templateInterface
 }
 

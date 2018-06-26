@@ -19,6 +19,9 @@ type ActionTemplate struct {
 	Type        string      `json:"type"`
 }
 
+// byLength yype to sort component name list by it's name length
+type byLength []string
+
 //GetActionTemplate - set call for read template/blueprint
 func (c *APIClient) GetActionTemplate(resourceViewsTemplate *ResourceView, actionURLString string) (*ActionTemplate, *ResourceView, error) {
 	//Fetch an action URL from given template
@@ -83,4 +86,14 @@ func (c *APIClient) GetDestroyActionTemplate(resourceData *ResourceView) (*Actio
 	actionURL := "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.destroy.name}"
 	//Set get action URL function call
 	return c.GetActionTemplate(resourceData, actionURL)
+}
+
+func (s byLength) Less(i, j int) bool {
+	return len(s[i]) < len(s[j])
+}
+func (s byLength) Len() int {
+	return len(s)
+}
+func (s byLength) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
