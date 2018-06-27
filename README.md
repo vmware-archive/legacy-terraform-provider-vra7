@@ -22,7 +22,7 @@ Setup a GOLang project structure
 |-/home/<USER>/TerraformPluginProject
     |-bin
     |-pkg
-    |-pkg
+    |-src
 
 ```
 
@@ -171,6 +171,8 @@ Optional:
 * **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
 
 * **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
+
+* **wait_timeout** - *wait_timeout is optional field with default value of 15 mins. wait_timeout defines the time to wait until resource comes up or destroys resource successfully*
 
 
 Example 1
