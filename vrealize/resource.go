@@ -289,7 +289,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			if strings.HasPrefix(configKey, componentName) {
 				//If user_configuration contains resource_list element
 				// then split user configuration key into resource_name and field_name
-					propertyName := strings.TrimPrefix(configKey, componentName+".")
+				propertyName := strings.TrimPrefix(configKey, componentName+".")
 				if len(propertyName) == 0 {
 					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, componentName+".")
 				}
@@ -525,82 +525,6 @@ func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourc
 	return nil
 }
 
-func fetchResourceFieldsValues(d *schema.ResourceData, meta interface{}) error {
-	//Get requester machine ID from schema.dataresource
-	requestMachineID := d.Id()
-	//Get client handle
-	client := meta.(*APIClient)
-	//Fetch resource details from vRA
-	templateResources, errTemplate := client.GetDeploymentState(requestMachineID)
-	if errTemplate != nil {
-		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
-	}
-
-	//Read terraform resource > resource_configuration
-	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
-
-	const reconfigGetLinkTitle = "GET Template: " +
-		"{com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Reconfigure}"
-
-	//Read vRA resource content one by one
-	for _,value := range templateResources.Content {
-		resourceMap := value.(map[string]interface{})
-		resourceSpecificData := resourceMap["data"].(map[string]interface{})
-		resourceSpecificLinks := resourceMap["links"].([]interface{})
-		//If component is not empty
-		//Check if content object is child or not
-		if resourceMap["resourceType"] == "Infrastructure.Virtual" {
-			componentName := resourceSpecificData["Component"].(string)
-			var reconfigGetLink string
-			//Iterate over the links present in content elements
-			//Get resource child reconfiguration link
-			for link := range resourceSpecificLinks {
-				linkInterface := resourceSpecificLinks[link].(map[string]interface{})
-				if linkInterface["rel"] == reconfigGetLinkTitle {
-					//Get resource reconfiguration template link
-					reconfigGetLink = linkInterface["href"].(string)
-					break
-				}
-			}
-			resourceAction := new(ResourceActionTemplate)
-			apiError := new(APIError)
-			//Get resource child reconfiguration template json
-			response, err := client.HTTPClient.New().Get(reconfigGetLink).
-				Receive(resourceAction, apiError)
-			response.Close = true
-
-			if !apiError.isEmpty() {
-				return apiError
-			}
-			if err != nil {
-				return err
-			}
-
-			//Iterate over TF resource > resource_configuration
-			for configKey, _ := range resourceConfiguration {
-				//Compare vRA child resource and TF resource > resource_configuration names
-				if strings.HasPrefix(configKey, componentName+".") {
-					nameList := strings.SplitN(configKey, componentName+".", 2)
-					//Read field value from vRA child resource
-					var returnValue interface{}
-					returnValue = getTemplateValue(resourceAction.Data, nameList[1])
-					//Check if value returned from getTemplateValue is not nil
-					if returnValue == nil {
-						returnValue = getTemplateValue(resourceMap, nameList[1])
-					}
-					resourceConfiguration = updateTFResourceConfigurationMap(returnValue, resourceConfiguration, configKey, d)
-					errSet := d.Set("resource_configuration", resourceConfiguration)
-					// If set resource_configuration throws any error then return the same
-					if errSet != nil {
-						return errSet
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
 func updateTFResourceConfigurationMap(returnValue interface{}, resourceConfiguration map[string]interface{},
 	configKey string, d *schema.ResourceData) map[string]interface{} {
 	//If value returned from getTemplateValue is in float64 format then
@@ -655,10 +579,6 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
 	}
-	fetchError := fetchResourceFieldsValues(d, meta)
-	if fetchError != nil {
-		return fetchError
-	}
 
 	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
 	if errTemplate != nil {
@@ -686,7 +606,6 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			childConfig[componentName] = resourceAction.Data
 		}
 	}
-
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	changed := false
 
@@ -739,8 +658,9 @@ func updateResourceConfigurationMap(
 				currentValue := configValue1
 				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
 				if updatedValue != currentValue {
-					configValue1 = updatedValue
+					resourceConfiguration[configKey1] = updatedValue
 					changed = true
+					break
 				}
 			}
 		}
