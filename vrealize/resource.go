@@ -463,7 +463,10 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				configChanged := false
 				returnFlag := false
-				for configKey := range resourceConfiguration {
+				for configKey, configValue := range resourceConfiguration {
+					if configValue == "" {
+						continue
+					}
 					//compare resource list (resource_name) with user configuration fields
 					if strings.HasPrefix(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
@@ -590,6 +593,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 	var childConfig map[string]interface{}
 	childConfig = map[string]interface{}{}
+	componentData := map[string]interface{}{}
 
 	for _, value := range GetDeploymentStateData.Content {
 		resourceMap := value.(map[string]interface{})
@@ -604,20 +608,19 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 				return err
 			}
 			childConfig[componentName] = resourceAction.Data
+			componentData[componentName] = resourceMap
 		}
 	}
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	changed := false
 
-	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig)
-
+	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig, componentData)
 	if changed {
 		setError := d.Set("resource_configuration", resourceConfiguration)
 		if setError != nil {
 			return fmt.Errorf(setError.Error())
 		}
 	}
-
 	return nil
 }
 
@@ -649,16 +652,21 @@ func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, m
 // resourceConfiguration : updated resource_configuration map[string]interface data
 // changed : boolean for data got changed or not
 func updateResourceConfigurationMap(
-	resourceConfiguration map[string]interface{}, vmData map[string]interface{}) (map[string]interface{}, bool) {
+	resourceConfiguration map[string]interface{}, vmData map[string]interface{}, componentData map[string]interface{}) (map[string]interface{}, bool) {
 	var changed bool
 	for configKey1, configValue1 := range resourceConfiguration {
 		for configKey2, configValue2 := range vmData {
 			if strings.HasPrefix(configKey1, configKey2+".") {
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
-				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
-				if updatedValue != currentValue {
-					resourceConfiguration[configKey1] = updatedValue
+				updatedValue1 := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
+				updatedValue2 := getTemplateFieldValue(componentData[configKey2].(map[string]interface{}), trimmedKey)
+				if updatedValue1 != currentValue && updatedValue1 != nil {
+					resourceConfiguration[configKey1] = updatedValue1
+					changed = true
+					break
+				}else if updatedValue2 != currentValue && updatedValue2 != nil {
+					resourceConfiguration[configKey1] = updatedValue2
 					changed = true
 					break
 				}
