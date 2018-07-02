@@ -1,44 +1,14 @@
 package vrealize
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
 	"gopkg.in/jarcoal/httpmock.v1"
+	"reflect"
 	"testing"
 )
 
 var client APIClient
-
-func init() {
-	t := new(testing.T)
-	fmt.Println("init")
-	client = NewClient(
-		"admin@myvra.local",
-		"pass!@#",
-		"vsphere.local",
-		"http://localhost/",
-		true,
-	)
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZX
-		JuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY
-		4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4
-		ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
-
-	client.Authenticate()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
-
-	err := client.Authenticate()
-	if err == nil {
-		t.Errorf("Authentication should fail")
-	}
-}
 
 func TestNewClient(t *testing.T) {
 	username := "admin@myvra.local"
@@ -76,8 +46,11 @@ func TestClient_Authenticate(t *testing.T) {
 	defer httpmock.DeactivateAndReset()
 
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZXJuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
+		httpmock.NewStringResponder(200, `{
+		  "expires": "2017-07-25T15:18:49.000Z",
+		  "id": "MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZXJuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=",
+		  "tenant": "vsphere.local"
+		}`))
 
 	err := client.Authenticate()
 
@@ -86,7 +59,17 @@ func TestClient_Authenticate(t *testing.T) {
 	}
 
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
+		httpmock.NewErrorResponder(errors.New(`{
+		  "errors": [
+			{
+			  "code": 90135,
+			  "source": null,
+			  "message": "Unable to authenticate user jason@corp.local1 in tenant vsphere.local.",
+			  "systemMessage": "90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.",
+			  "moreInfoUrl": null
+			}
+		  ]
+		}`)))
 
 	err = client.Authenticate()
 
@@ -106,11 +89,11 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 	template, err := client.GetCatalogItem("e5dd4fba-45ed-4943-b1fc-7f96239286be")
 
 	if err != nil {
-		t.Errorf("Fail to get catalog template %v.", err)
+		t.Errorf("Fail to get catalog Item template %v.", err)
 	}
 
 	if len(template.CatalogItemID) == 0 {
-		t.Errorf("Catalog item id is empty.")
+		t.Errorf("Catalog Item id is empty.")
 	}
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/"+
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests/template",
@@ -123,7 +106,7 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 	}
 
 	if template != nil {
-		t.Errorf("Catalog item id is not empty.")
+		t.Errorf("Catalog Item id is not empty.")
 	}
 }
 
@@ -144,7 +127,7 @@ func TestAPIClient_RequestMachine(t *testing.T) {
 		t.Errorf("Failed to get catalog item template %v.", err)
 	}
 	if len(template.CatalogItemID) == 0 {
-		t.Errorf("Catalog Id is empty.")
+		t.Errorf("Catalog Item Id is empty.")
 	}
 
 	requestMachine, errorRequestMachine := client.RequestMachine(template)
@@ -179,7 +162,7 @@ func TestAPIClient_GetResourceViews(t *testing.T) {
 		"api/consumer/requests/937099db-5174-4862-99a3-9c2666bfca28/resourceViews",
 		httpmock.NewStringResponder(200, `{"links":[],"content":[{"@type":"CatalogResourceView","resourceId":"b313acd6-0738-439c-b601-e3ebf9ebb49b","iconId":"502efc1b-d5ce-4ef9-99ee-d4e2a741747c","name":"CentOS 6.3 - IPAM EXT-95563173","description":"","status":null,"catalogItemId":"502efc1b-d5ce-4ef9-99ee-d4e2a741747c","catalogItemLabel":"CentOS 6.3 - IPAM EXT","requestId":"dcb12203-93f4-4873-a7d5-1757f3696141","requestState":"SUCCESSFUL","resourceType":"composition.resource.type.deployment","owners":["Jason Cloud Admin"],"businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","tenantId":"vsphere.local","dateCreated":"2017-07-17T13:26:42.102Z","lastUpdated":"2017-07-17T13:33:25.521Z","lease":{"start":"2017-07-17T13:26:42.079Z","end":null},"costs":null,"costToDate":null,"totalCost":null,"parentResourceId":null,"hasChildren":true,"data":{},"links":[{"@type":"link","rel":"GET: Catalog Item","href":"http://localhost/catalog-service/api/consumer/entitledCatalogItemViews/502efc1b-d5ce-4ef9-99ee-d4e2a741747c"},{"@type":"link","rel":"GET: Request","href":"http://localhost/catalog-service/api/consumer/requests/dcb12203-93f4-4873-a7d5-1757f3696141"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changelease.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/561be422-ece6-4316-8acb-a8f3dbb8ed0c/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changelease.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/561be422-ece6-4316-8acb-a8f3dbb8ed0c/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changeowner.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/59249166-e427-4082-a3dc-eb7223bb2de1/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changeowner.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/59249166-e427-4082-a3dc-eb7223bb2de1/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.destroy.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/3da0ca14-e7e2-4d7b-89cb-c6db57440d72/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.destroy.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/3da0ca14-e7e2-4d7b-89cb-c6db57440d72/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.archive.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/9725d56e-461a-471a-be00-b1856681c6d0/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.archive.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/9725d56e-461a-471a-be00-b1856681c6d0/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/85e090f9-9529-4101-9691-6bab1b0a1f77/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/85e090f9-9529-4101-9691-6bab1b0a1f77/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/ab5795f5-32ad-4f6c-8598-1d3a7d190caa/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}","href":"http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/ab5795f5-32ad-4f6c-8598-1d3a7d190caa/requests"},{"@type":"link","rel":"GET: Child Resources","href":"http://localhost/catalog-service/api/consumer/resourceViews?managedOnly=false&withExtendedData=true&withOperations=true&%24filter=parentResource%20eq%20%27b313acd6-0738-439c-b601-e3ebf9ebb49b%27"}]},{"@type":"CatalogResourceView","resourceId":"51bf8bd7-8553-4b0d-b580-41ab0cfaf9a5","iconId":"Infrastructure.CatalogItem.Machine.Virtual.vSphere","name":"Content0061","description":"Basic IaaS CentOS Machine","status":"Missing","catalogItemId":null,"catalogItemLabel":null,"requestId":"dcb12203-93f4-4873-a7d5-1757f3696141","requestState":"SUCCESSFUL","resourceType":"Infrastructure.Virtual","owners":["Jason Cloud Admin"],"businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","tenantId":"vsphere.local","dateCreated":"2017-07-17T13:33:16.686Z","lastUpdated":"2017-07-17T13:33:25.521Z","lease":{"start":"2017-07-17T13:26:42.079Z","end":null},"costs":null,"costToDate":null,"totalCost":null,"parentResourceId":"b313acd6-0738-439c-b601-e3ebf9ebb49b","hasChildren":false,"data":{"Component":"CentOS_6.3","DISK_VOLUMES":[{"componentTypeId":"com.vmware.csp.component.iaas.proxy.provider","componentId":null,"classId":"dynamicops.api.model.DiskInputModel","typeFilter":null,"data":{"DISK_CAPACITY":3,"DISK_INPUT_ID":"DISK_INPUT_ID1","DISK_LABEL":"Hard disk 1"}}],"Destroy":true,"EXTERNAL_REFERENCE_ID":"vm-773","IS_COMPONENT_MACHINE":false,"MachineBlueprintName":"CentOS 6.3 - IPAM EXT","MachineCPU":1,"MachineDailyCost":0,"MachineDestructionDate":null,"MachineExpirationDate":null,"MachineGroupName":"Content","MachineGuestOperatingSystem":"CentOS 4/5/6/7 (64-bit)","MachineInterfaceDisplayName":"vSphere (vCenter)","MachineInterfaceType":"vSphere","MachineMemory":512,"MachineName":"Content0061","MachineReservationName":"IPAM Sandbox","MachineStorage":3,"MachineType":"Virtual","NETWORK_LIST":[{"componentTypeId":"com.vmware.csp.component.iaas.proxy.provider","componentId":null,"classId":"dynamicops.api.model.NetworkViewModel","typeFilter":null,"data":{"NETWORK_ADDRESS":"192.168.110.150","NETWORK_MAC_ADDRESS":"00:50:56:ae:31:bd","NETWORK_NAME":"VM Network","NETWORK_NETWORK_NAME":"ipamext1921681100","NETWORK_PROFILE":"ipam-ext-192.168.110.0"}}],"SNAPSHOT_LIST":[],"Unregister":true,"VirtualMachine.Admin.UUID":"502e9fb3-6f0d-0b1e-f90f-a769fd406620","endpointExternalReferenceId":"d322b019-58d4-4d6f-9f8b-d28695a716c0","ip_address":"192.168.110.150","machineId":"4fc33663-992d-49f8-af17-df7ce4831aa0"},"links":[{"@type":"link","rel":"GET: Request","href":"http://localhost/catalog-service/api/consumer/requests/dcb12203-93f4-4873-a7d5-1757f3696141"},{"@type":"link","rel":"GET: Parent Resource","href":"http://localhost/catalog-service/api/consumer/resourceViews/b313acd6-0738-439c-b601-e3ebf9ebb49b"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.virtual.Destroy}","href":"http://localhost/catalog-service/api/consumer/resources/51bf8bd7-8553-4b0d-b580-41ab0cfaf9a5/actions/654b4c71-e84f-40c7-9439-fd409fea7323/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.virtual.Destroy}","href":"http://localhost/catalog-service/api/consumer/resources/51bf8bd7-8553-4b0d-b580-41ab0cfaf9a5/actions/654b4c71-e84f-40c7-9439-fd409fea7323/requests"},{"@type":"link","rel":"GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Unregister}","href":"http://localhost/catalog-service/api/consumer/resources/51bf8bd7-8553-4b0d-b580-41ab0cfaf9a5/actions/f3ae9408-885a-4a3a-9200-43366f2aa163/requests/template"},{"@type":"link","rel":"POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.Unregister}","href":"http://localhost/catalog-service/api/consumer/resources/51bf8bd7-8553-4b0d-b580-41ab0cfaf9a5/actions/f3ae9408-885a-4a3a-9200-43366f2aa163/requests"}]},{"@type":"CatalogResourceView","resourceId":"169b596f-e4c0-4b25-ba44-18cb19c0fd65","iconId":"existing_network","name":"ipamext1921681100","description":"Infoblox External Network","status":null,"catalogItemId":null,"catalogItemLabel":null,"requestId":"dcb12203-93f4-4873-a7d5-1757f3696141","requestState":"SUCCESSFUL","resourceType":"Infrastructure.Network.Network.Existing","owners":["Jason Cloud Admin"],"businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","tenantId":"vsphere.local","dateCreated":"2017-07-17T13:27:17.526Z","lastUpdated":"2017-07-17T13:33:25.521Z","lease":{"start":"2017-07-17T13:26:42.079Z","end":null},"costs":null,"costToDate":null,"totalCost":null,"parentResourceId":"b313acd6-0738-439c-b601-e3ebf9ebb49b","hasChildren":false,"data":{"Description":"Infoblox External Network","IPAMEndpointId":"1c2b6237-540a-43c3-8c06-b37a1d274b44","IPAMEndpointName":"Infoblox - nios01a","Name":"ipamext1921681100","_archiveDays":5,"_hasChildren":false,"_leaseDays":null,"_number_of_instances":1,"dns":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Network.Network.DnsWins","typeFilter":null,"data":{"alternate_wins":null,"dns_search_suffix":null,"dns_suffix":null,"preferred_wins":null,"primary_dns":null,"secondary_dns":null}},"gateway":null,"ip_ranges":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Network.Network.IpRanges","typeFilter":null,"data":{"description":"","end_ip":"","externalId":"network/default-vra/192.168.110.0/24","id":"b078d23a-1c3d-4458-ab57-e352c80e6d55","name":"192.168.110.0/24","start_ip":""}}],"network_profile":"ipam-ext-192.168.110.0","providerBindingId":"CentOS63Infoblox","providerId":"2fbaabc5-3a48-488a-9f2a-a42616345445","subnet_mask":"255.255.255.0","subtenantId":"53619006-56bb-4788-9723-9eab79752cc1"},"links":[{"@type":"link","rel":"GET: Request","href":"http://localhost/catalog-service/api/consumer/requests/dcb12203-93f4-4873-a7d5-1757f3696141"},{"@type":"link","rel":"GET: Parent Resource","href":"http://localhost/catalog-service/api/consumer/resourceViews/b313acd6-0738-439c-b601-e3ebf9ebb49b"}]}],"metadata":{"size":20,"totalElements":3,"totalPages":1,"number":1,"offset":0}}`))
 
-	template, err := client.GetResourceViews("937099db-5174-4862-99a3-9c2666bfca28")
+	template, err := client.GetDeploymentState("937099db-5174-4862-99a3-9c2666bfca28")
 	if err != nil {
 		t.Errorf("Fail to get resource views %v.", err)
 	}
@@ -191,7 +174,7 @@ func TestAPIClient_GetResourceViews(t *testing.T) {
 		"api/consumer/requests/937099db-5174-4862-99a3-9c2666bfca28/resourceViews",
 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":20111,"source":null,"message":"Unable to find the specified request in the service catalog: dcb12203-93f4-4873-a7d5-757f36961411.","systemMessage":"Unable to find the specified request in the service catalog: dcb12203-93f4-4873-a7d5-757f36961411.","moreInfoUrl":null}]}`)))
 
-	template, err = client.GetResourceViews("937099db-5174-4862-99a3-9c2666bfca28")
+	template, err = client.GetDeploymentState("937099db-5174-4862-99a3-9c2666bfca28")
 	if err == nil {
 		t.Errorf("Succeed to get resource views %v.", err)
 	}
@@ -212,7 +195,7 @@ func TestAPIClient_GetDestroyActionTemplate(t *testing.T) {
 	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/3da0ca14-e7e2-4d7b-89cb-c6db57440d72/requests/template",
 		httpmock.NewStringResponder(200, `{"type":"com.vmware.vcac.catalog.domain.request.CatalogResourceRequest","resourceId":"b313acd6-0738-439c-b601-e3ebf9ebb49b","actionId":"3da0ca14-e7e2-4d7b-89cb-c6db57440d72","description":null,"data":{"ForceDestroy":false}}`))
 
-	templateResources, errTemplate := client.GetResourceViews("937099db-5174-4862-99a3-9c2666bfca28")
+	templateResources, errTemplate := client.GetDeploymentState("937099db-5174-4862-99a3-9c2666bfca28")
 	if errTemplate != nil {
 		t.Errorf("Failed to get the template resources %v", errTemplate)
 	}
@@ -248,7 +231,7 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 	httpmock.RegisterResponder("POST", "http://localhost/catalog-service/api/consumer/resources/b313acd6-0738-439c-b601-e3ebf9ebb49b/actions/3da0ca14-e7e2-4d7b-89cb-c6db57440d72/requests",
 		httpmock.NewStringResponder(200, ``))
 
-	templateResources, errTemplate := client.GetResourceViews("937099db-5174-4862-99a3-9c2666bfca28")
+	templateResources, errTemplate := client.GetDeploymentState("937099db-5174-4862-99a3-9c2666bfca28")
 	if errTemplate != nil {
 		t.Errorf("Failed to get the template resources %v", errTemplate)
 	}
@@ -258,4 +241,34 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 		t.Errorf("Failed to get destroy action template %v", err)
 	}
 	client.DestroyMachine(destroyActionTemplate, resourceTemplate)
+}
+
+func TestChangeValueFunction(t *testing.T) {
+	template_original := CatalogItemTemplate{}
+	template_backup := CatalogItemTemplate{}
+	strJson := `{"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest","catalogItemId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","requestedFor":"jason@corp.local","businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","description":null,"reasons":null,"data":{"CentOS_6.3":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*CentOS_6.3","data":{"_allocation":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"data":{"machines":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation.Machine","typeFilter":null,"data":{"machine_id":"","nics":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Nic","typeFilter":null,"data":{"address":"","assignment_type":"Static","external_address":"","id":null,"load_balancing":null,"network":null,"network_profile":null}}]}}]}},"_cluster":1,"_hasChildren":false,"cpu":1,"datacenter_location":null,"description":"Basic IaaS CentOS Machine","disks":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"data":{"capacity":3,"custom_properties":null,"id":1450725224066,"initial_location":"","is_clone":true,"label":"Hard disk 1","storage_reservation_policy":"","userCreated":false,"volumeId":0}}],"guest_customization_specification":"CentOS","max_network_adapters":-1,"max_per_user":0,"max_volumes":60,"memory":512,"nics":null,"os_arch":"x86_64","os_distribution":null,"os_type":"Linux","os_version":null,"property_groups":null,"reservation_policy":null,"security_groups":[],"security_tags":[],"storage":3}},"_archiveDays":5,"_leaseDays":null,"_number_of_instances":1,"corp192168110024":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*corp192168110024","data":{"_hasChildren":false}}}}`
+	json.Unmarshal([]byte(strJson), &template_original)
+	json.Unmarshal([]byte(strJson), &template_backup)
+	var flag bool
+
+	template_original.Data, flag = changeTemplateValue(template_original.Data, "false_field", 1000)
+	if flag != false {
+		t.Errorf("False value updated")
+	}
+
+	eq := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	if !eq {
+		t.Errorf("False value updated")
+	}
+
+	template_original.Data, flag = changeTemplateValue(template_original.Data, "storage", 1000)
+	if flag == false {
+		t.Errorf("Failed to update interface value")
+	}
+
+	eq2 := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	if eq2 {
+		t.Errorf("Failed to update interface value")
+	}
+
 }
