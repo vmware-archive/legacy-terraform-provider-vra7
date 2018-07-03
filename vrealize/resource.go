@@ -40,9 +40,8 @@ type RequestStatusView struct {
 	Phase string `json:"phase"`
 }
 
-//RequestMachineResponse - used to store response of request
-//created against machine provision.
-type RequestMachineResponse struct {
+//CatalogRequest - A structure that captures a vRA catalog request.
+type CatalogRequest struct {
 	ID           string      `json:"id"`
 	IconID       string      `json:"iconId"`
 	Version      int         `json:"version"`
@@ -169,16 +168,15 @@ func setResourceSchema() map[string]*schema.Schema {
 	}
 }
 
-//Function use - to create machine
-//Terraform call - terraform apply
-func changeTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
+//Replace the value for a given key in a catalog request template.
+func replaceValueInRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
 	var replaced bool
 	//Iterate over the map to get field provided as an argument
 	for key := range templateInterface {
 		//If value type is map then set recursive call which will fiend field in one level down of map interface
 		if reflect.ValueOf(templateInterface[key]).Kind() == reflect.Map {
 			template, _ := templateInterface[key].(map[string]interface{})
-			templateInterface[key], replaced = changeTemplateValue(template, field, value)
+			templateInterface[key], replaced = replaceValueInRequestTemplate(template, field, value)
 			if replaced == true {
 				return templateInterface, true
 			}
@@ -193,14 +191,14 @@ func changeTemplateValue(templateInterface map[string]interface{}, field string,
 	return templateInterface, replaced
 }
 
-//modeled after changeTemplateValue, for values being added to template vs updating existing ones
-func addTemplateValue(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
+//modeled after replaceValueInRequestTemplate, for values being added to template vs updating existing ones
+func addValueToRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	//simplest case is adding a simple value. Leaving as a func in case there's a need to do more complicated additions later
 	//	templateInterface[data]
 	for k, v := range templateInterface {
 		if reflect.ValueOf(v).Kind() == reflect.Map && k == "data" {
 			template, _ := v.(map[string]interface{})
-			v = addTemplateValue(template, field, value)
+			v = addValueToRequestTemplate(template, field, value)
 		} else { //if i == "data" {
 			templateInterface[field] = value
 		}
@@ -213,7 +211,6 @@ func addTemplateValue(templateInterface map[string]interface{}, field string, va
 // This function creates a new vRA 7 Deployment using configuration in a user's Terraform file.
 // The Deployment is produced by invoking a catalog item that is specified in the configuration.
 func createResource(d *schema.ResourceData, meta interface{}) error {
-	// Log file handler to generate logs for debugging purpose
 	// Get client handle
 	vRAClient := meta.(*APIClient)
 
@@ -245,53 +242,53 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			d.Set("catalog_name", CatalogItemName.(string))
 		}
 	}
-	//Get catalog item blueprint
-	templateCatalogItem, err := vRAClient.GetCatalogItem(d.Get("catalog_id").(string))
-	log.Printf("createResource->templateCatalogItem %v\n", templateCatalogItem)
+	//Get request template for catalog item.
+	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get("catalog_id").(string))
+	log.Printf("createResource->requestTemplate %v\n", requestTemplate)
 
 	catalogConfiguration, _ := d.Get("catalog_configuration").(map[string]interface{})
 	for field1 := range catalogConfiguration {
-		templateCatalogItem.Data[field1] = catalogConfiguration[field1]
+		requestTemplate.Data[field1] = catalogConfiguration[field1]
 
 	}
-	log.Printf("createResource->templateCatalogItem.Data %v\n", templateCatalogItem.Data)
+	log.Printf("createResource->requestTemplate.Data %v\n", requestTemplate.Data)
 
 	if len(d.Get("businessgroup_id").(string)) > 0 {
-		templateCatalogItem.BusinessGroupID = d.Get("businessgroup_id").(string)
+		requestTemplate.BusinessGroupID = d.Get("businessgroup_id").(string)
 	}
 
-	// Get all resource keys from blueprint in array
+	// Get all component names in the blueprint corresponding to the catalog item.
 	var componentNameList []string
-	for field := range templateCatalogItem.Data {
-		if reflect.ValueOf(templateCatalogItem.Data[field]).Kind() == reflect.Map {
+	for field := range requestTemplate.Data {
+		if reflect.ValueOf(requestTemplate.Data[field]).Kind() == reflect.Map {
 			componentNameList = append(componentNameList, field)
 		}
 	}
 	log.Printf("createResource->key_list %v\n", componentNameList)
 
-	// Arrange keys in descending order of text length
-	// Sorting component name list is required because in the following condition
-	// 1. CentOS_6.3
-	// 2. CentOS_6.3.1
-	// So the case was updated happened for 2nd component instead of 1st.
-	// Hence, to make sure all is going fine, this block of code is added.
+	// Arrange component names in descending order of text length.
+	// Component names are sorted this way because '.', which is used as a separator, may also occur within
+	// component names. In these situations, the longest name match that includes '.'s should win.
 	sort.Sort(byLength(componentNameList))
 
-	//Update template field values with user configuration
+	//Update request template field values with values from user configuration.
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	for configKey, configValue := range resourceConfiguration {
 		for _, componentName := range componentNameList {
-			//compare resource list (resource_name) with user configuration fields (resource_name+field_name)
+			// User-supplied resource configuration keys are expected to be of the form:
+			//     <component name>.<property name>.
+			// Extract the property names and values for each component in the blueprint, and add/update
+			// them in the right location in the request template.
 			if strings.HasPrefix(configKey, componentName) {
-				//If user_configuration contains resource_list element
-				// then split user configuration key into resource_name and field_name
-					propertyName := strings.TrimPrefix(configKey, componentName+".")
+				propertyName := strings.TrimPrefix(configKey, componentName+".")
 				if len(propertyName) == 0 {
-					return fmt.Errorf("resource_configuration key is not in correct format. Expected %s to start with %s", configKey, componentName+".")
+					return fmt.Errorf(
+						"resource_configuration key is not in correct format. Expected %s to start with %s",
+						configKey, componentName+".")
 				}
-				// Function call which changes the template field values with  user values
-				templateCatalogItem.Data[componentName] = addOrUpdateConfigTemplateMap(
-					templateCatalogItem.Data[componentName].(map[string]interface{}),
+				// Function call which changes request template field values with user-supplied values
+				requestTemplate.Data[componentName] = updateRequestTemplate(
+					requestTemplate.Data[componentName].(map[string]interface{}),
 					propertyName,
 					configValue)
 				break
@@ -306,15 +303,15 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		fieldstr := fmt.Sprintf("%s", depField)
 		switch fieldstr {
 		case "description":
-			templateCatalogItem.Description = depValue.(string)
+			requestTemplate.Description = depValue.(string)
 		case "reasons":
-			templateCatalogItem.Reasons = depValue.(string)
+			requestTemplate.Reasons = depValue.(string)
 		default:
 			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
 		}
 	}
 	//Log print of template after values updated
-	log.Printf("Updated template - %v\n", templateCatalogItem.Data)
+	log.Printf("Updated template - %v\n", requestTemplate.Data)
 
 	//Return an exception if there is any error while getting catalog item template
 	if err != nil {
@@ -322,7 +319,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	//Set a  create machine function call
-	requestMachine, err := vRAClient.RequestMachine(templateCatalogItem)
+	requestMachine, err := vRAClient.RequestMachine(requestTemplate)
 
 	//Check if error got while create machine call
 	//If Error is occured, through an exception with an error message
@@ -367,12 +364,12 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func addOrUpdateConfigTemplateMap(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
+func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
 	var replaced bool
-	templateInterface, replaced = changeTemplateValue(templateInterface, field, value)
+	templateInterface, replaced = replaceValueInRequestTemplate(templateInterface, field, value)
 
 	if !replaced {
-		templateInterface["data"] = addTemplateValue(templateInterface["data"].(map[string]interface{}), field, value)
+		templateInterface["data"] = addValueToRequestTemplate(templateInterface["data"].(map[string]interface{}), field, value)
 	}
 	return templateInterface
 }
@@ -467,7 +464,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						//actionResponseInterface := actionResponse.(map[string]interface{})
 						//Function call which changes the template field values with  user values
 						//Replace existing values with new values in resource child template
-						resourceAction.Data, returnFlag = changeTemplateValue(
+						resourceAction.Data, returnFlag = replaceValueInRequestTemplate(
 							resourceAction.Data,
 							nameList[1],
 							resourceConfiguration[configKey])
@@ -832,25 +829,25 @@ func (vRAClient *APIClient) GetDeploymentState(CatalogRequestId string) (*Resour
 	return ResourceView, nil
 }
 
-//RequestMachine - To set create resource REST call
-func (vRAClient *APIClient) RequestMachine(template *CatalogItemTemplate) (*RequestMachineResponse, error) {
+//RequestMachine - Make a catalog request.
+func (vRAClient *APIClient) RequestMachine(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
-		"/requests", template.CatalogItemID)
+		"/requests", requestTemplate.CatalogItemID)
 
-	requestMachineRes := new(RequestMachineResponse)
+	catalogRequest := new(CatalogRequest)
 	apiError := new(APIError)
 
-	jsonBody, jErr := json.Marshal(template)
+	jsonBody, jErr := json.Marshal(requestTemplate)
 	if jErr != nil {
-		log.Printf("Error marshalling template as JSON")
+		log.Printf("Error marshalling request templat as JSON")
 		return nil, jErr
 	}
 
 	log.Printf("JSON Request Info: %s", jsonBody)
 	//Set a REST call to create a machine
-	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(template).
-		Receive(requestMachineRes, apiError)
+	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(requestTemplate).
+		Receive(catalogRequest, apiError)
 
 	if err != nil {
 		return nil, err
@@ -860,5 +857,5 @@ func (vRAClient *APIClient) RequestMachine(template *CatalogItemTemplate) (*Requ
 		return nil, apiError
 	}
 
-	return requestMachineRes, nil
+	return catalogRequest, nil
 }
