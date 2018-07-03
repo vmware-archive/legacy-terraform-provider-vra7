@@ -437,11 +437,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				resourceSpecificData := resourceMap["data"].(map[string]interface{})
 				//resourceSpecificLinks := resourceMap["links"].([]interface{})
 				componentName := resourceSpecificData["Component"].(string)
-				resourceAction := new(ResourceActionTemplate)
+				resourceActionTemplate := new(ResourceActionTemplate)
 				apiError := new(APIError)
 				//Get reource child reconfiguration template json
 				response, err := vRAClient.HTTPClient.New().Get(VMReconfigActionUrls[componentName].([]string)[0]).
-					Receive(resourceAction, apiError)
+					Receive(resourceActionTemplate, apiError)
 				response.Close = true
 
 				if !apiError.isEmpty() {
@@ -461,8 +461,8 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						//actionResponseInterface := actionResponse.(map[string]interface{})
 						//Function call which changes the template field values with  user values
 						//Replace existing values with new values in resource child template
-						resourceAction.Data, returnFlag = replaceValueInRequestTemplate(
-							resourceAction.Data,
+						resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(
+							resourceActionTemplate.Data,
 							nameList[1],
 							resourceConfiguration[configKey])
 						if returnFlag == true {
@@ -478,7 +478,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					err := postResourceConfig(
 						d,
 						VMReconfigActionUrls[componentName].([]string)[1],
-						resourceAction,
+						resourceActionTemplate,
 						meta)
 					if err != nil {
 						return err
@@ -491,13 +491,13 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceAction *ResourceActionTemplate, meta interface{}) error {
+func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate *ResourceActionTemplate, meta interface{}) error {
 	vRAClient := meta.(*APIClient)
-	resourceAction2 := new(ResourceActionTemplate)
+	resourceActionTemplate2 := new(ResourceActionTemplate)
 	apiError2 := new(APIError)
 
 	response2, _ := vRAClient.HTTPClient.New().Post(reconfigPostLink).
-		BodyJSON(resourceAction).Receive(resourceAction2, apiError2)
+		BodyJSON(resourceActionTemplate).Receive(resourceActionTemplate2, apiError2)
 
 	if response2.StatusCode != 201 {
 		oldData, _ := d.GetChange("resource_configuration")
@@ -555,11 +555,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			componentName := resourceSpecificData["Component"].(string)
 			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
 
-			resourceAction, err := getResourceConfigTemplate(reconfigGetLink, d, meta)
+			resourceActionTemplate, err := getResourceConfigTemplate(reconfigGetLink, d, meta)
 			if err != nil {
 				return err
 			}
-			childConfig[componentName] = resourceAction.Data
+			childConfig[componentName] = resourceActionTemplate.Data
 		}
 	}
 
@@ -580,10 +580,10 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, meta interface{}) (*ResourceActionTemplate, error) {
 	vRAClient := meta.(*APIClient)
-	resourceAction := new(ResourceActionTemplate)
+	resourceActionTemplate := new(ResourceActionTemplate)
 	apiError := new(APIError)
 	//Get reource child reconfiguration template json
-	resp, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).Receive(resourceAction, apiError)
+	resp, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).Receive(resourceActionTemplate, apiError)
 	resp.Close = true
 	if !apiError.isEmpty() {
 		return nil, apiError
@@ -595,7 +595,7 @@ func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, m
 		}
 		return nil, err
 	}
-	return resourceAction, nil
+	return resourceActionTemplate, nil
 }
 
 // updateResourceConfigurationMap - updates the tf resource > resource_configuration type interface with given values
