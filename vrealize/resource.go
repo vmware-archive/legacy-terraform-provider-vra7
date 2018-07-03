@@ -372,7 +372,7 @@ func addOrUpdateConfigTemplateMap(templateInterface map[string]interface{}, fiel
 	templateInterface, replaced = changeTemplateValue(templateInterface, field, value)
 
 	if !replaced {
-		templateInterface = addTemplateValue(templateInterface["data"].(map[string]interface{}), field, value)
+		templateInterface["data"] = addTemplateValue(templateInterface["data"].(map[string]interface{}), field, value)
 	}
 	return templateInterface
 }
