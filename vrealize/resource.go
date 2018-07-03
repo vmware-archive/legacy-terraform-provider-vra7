@@ -310,25 +310,22 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
 		}
 	}
-	//Log print of template after values updated
+
 	log.Printf("Updated template - %v\n", requestTemplate.Data)
 
-	//Return an exception if there is any error while getting catalog item template
 	if err != nil {
 		return fmt.Errorf("Invalid CatalogItem ID %v", err)
 	}
 
-	//Set a  create machine function call
-	requestMachine, err := vRAClient.RequestMachine(requestTemplate)
+	//Fire off a catalog item request to create a deployment.
+	catalogRequest, err := vRAClient.RequestCatalogItem(requestTemplate)
 
-	//Check if error got while create machine call
-	//If Error is occured, through an exception with an error message
 	if err != nil {
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
 
 	//Set request ID
-	d.SetId(requestMachine.ID)
+	d.SetId(catalogRequest.ID)
 	//Set request status
 	d.Set("request_status", "SUBMITTED")
 
@@ -829,8 +826,8 @@ func (vRAClient *APIClient) GetDeploymentState(CatalogRequestId string) (*Resour
 	return ResourceView, nil
 }
 
-//RequestMachine - Make a catalog request.
-func (vRAClient *APIClient) RequestMachine(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
+//RequestCatalogItem - Make a catalog request.
+func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
 		"/requests", requestTemplate.CatalogItemID)

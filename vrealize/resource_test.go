@@ -110,7 +110,7 @@ func TestAPIClient_GetCatalogItemRequestTemplate(t *testing.T) {
 	}
 }
 
-func TestAPIClient_RequestMachine(t *testing.T) {
+func TestAPIClient_RequestCatalogItem(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
@@ -130,28 +130,28 @@ func TestAPIClient_RequestMachine(t *testing.T) {
 		t.Errorf("Catalog Item Id is empty.")
 	}
 
-	requestMachine, errorRequestMachine := client.RequestMachine(template)
+	catalogRequest, errorRequestCatalogItem := client.RequestCatalogItem(template)
 
-	if errorRequestMachine != nil {
-		t.Errorf("Failed to request the machine %v.", errorRequestMachine)
+	if errorRequestCatalogItem != nil {
+		t.Errorf("Failed to request the catalog item %v.", errorRequestCatalogItem)
 	}
 
-	if len(requestMachine.ID) == 0 {
-		t.Errorf("Failed to request machine.")
+	if len(catalogRequest.ID) == 0 {
+		t.Errorf("Failed to request catalog item.")
 	}
 
 	httpmock.RegisterResponder("POST", "http://localhost/catalog-service/"+
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests",
 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: a3647254-3c50-4fe6-a636-9ae28bf3c811.","systemMessage":"Unable to find the specified catalog item in the service catalog: a3647254-3c50-4fe6-a636-9ae28bf3c811.","moreInfoUrl":null}]}`)))
 
-	requestMachine, errorRequestMachine = client.RequestMachine(template)
+	catalogRequest, errorRequestCatalogItem = client.RequestCatalogItem(template)
 
-	if errorRequestMachine == nil {
+	if errorRequestCatalogItem == nil {
 		t.Errorf("Failed to generate exception.")
 	}
 
-	if requestMachine != nil {
-		t.Errorf("Deploy machine request succeeded.")
+	if catalogRequest != nil {
+		t.Errorf("Catalog item request initiated successfully.")
 	}
 }
 func TestAPIClient_GetResourceViews(t *testing.T) {
