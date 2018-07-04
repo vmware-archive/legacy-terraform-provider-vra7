@@ -560,6 +560,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 				return err
 			}
 			childConfig[componentName] = resourceActionTemplate.Data
+
+			// get IP address
+			if ipAddress, ok := resourceSpecificData["ip_address"]; ok {
+				childConfig[componentName].(map[string]interface{})["ip_address"] = ipAddress.(string)
+			}
 		}
 	}
 
