@@ -619,8 +619,9 @@ func updateResourceConfigurationMap(
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
 				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
-				if updatedValue != currentValue {
-					configValue1 = updatedValue
+
+				if updatedValue != nil && updatedValue != currentValue {
+					resourceConfiguration[configKey1] = updatedValue
 					changed = true
 				}
 			}
