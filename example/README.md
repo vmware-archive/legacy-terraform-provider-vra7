@@ -6,6 +6,7 @@ Examples:
 - simple - simple single machine example
 - depends_on - example illustrating how to make one machine depend on another
 - multi-machine - example showing multiple machines in one catalog
+- remote-execute - example showing how to remote-execute commands on a VM as soon as it's created
 
 
 ## Prerequisites
