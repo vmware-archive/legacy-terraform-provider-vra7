@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-//CatalogItemTemplate - This struct holds blueprint response of catalog
-type CatalogItemTemplate struct {
+//CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
+type CatalogItemRequestTemplate struct {
 	Type            string                 `json:"type"`
 	CatalogItemID   string                 `json:"catalogItemId"`
 	RequestedFor    string                 `json:"requestedFor"`
@@ -28,19 +28,19 @@ type CatalogItem struct {
 	CatalogItem catalogName `json:"catalogItem"`
 }
 
-//GetCatalogItem - set call to read catalog item provided in terraform config file
-func (c *APIClient) GetCatalogItem(uuid string) (*CatalogItemTemplate, error) {
-	//Form a path to read catalog template via REST call
+//GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
+func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemId string) (*CatalogItemRequestTemplate, error) {
+	//Form a path to read catalog request template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s/requests/template",
-		uuid)
+		catalogItemId)
 
-	log.Printf("GetCatalogItem->path %v\n", path)
+	log.Printf("GetCatalogItemRequestTemplate->path %v\n", path)
 
-	template := new(CatalogItemTemplate)
+	requestTemplate := new(CatalogItemRequestTemplate)
 	apiError := new(APIError)
-	//Make a REST call to get catalog item template
-	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
+	//Make the REST call to get catalog request template
+	_, err := c.HTTPClient.New().Get(path).Receive(requestTemplate, apiError)
 
 	if err != nil {
 		return nil, err
@@ -50,8 +50,8 @@ func (c *APIClient) GetCatalogItem(uuid string) (*CatalogItemTemplate, error) {
 		return nil, apiError
 	}
 	//Return catalog item template
-	log.Printf("GetCatalogItem->template %v\n", template)
-	return template, nil
+	log.Printf("GetCatalogItemRequestTemplate->requestTemplate %v\n", requestTemplate)
+	return requestTemplate, nil
 }
 
 type entitledCatalogItemViews struct {

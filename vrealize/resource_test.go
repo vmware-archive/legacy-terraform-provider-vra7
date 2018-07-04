@@ -78,7 +78,7 @@ func TestClient_Authenticate(t *testing.T) {
 	}
 }
 
-func TestAPIClient_GetCatalogItem(t *testing.T) {
+func TestAPIClient_GetCatalogItemRequestTemplate(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
@@ -86,7 +86,7 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests/template",
 		httpmock.NewStringResponder(200, `{"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest","catalogItemId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","requestedFor":"jason@corp.local","businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","description":null,"reasons":null,"data":{"CentOS_6.3":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*CentOS_6.3","data":{"_allocation":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"data":{"machines":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation.Machine","typeFilter":null,"data":{"machine_id":"","nics":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Nic","typeFilter":null,"data":{"address":"","assignment_type":"Static","external_address":"","id":null,"load_balancing":null,"network":null,"network_profile":null}}]}}]}},"_cluster":1,"_hasChildren":false,"cpu":1,"datacenter_location":null,"description":"Basic IaaS CentOS Machine","disks":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"data":{"capacity":3,"custom_properties":null,"id":1450725224066,"initial_location":"","is_clone":true,"label":"Hard disk 1","storage_reservation_policy":"","userCreated":false,"volumeId":0}}],"guest_customization_specification":"CentOS","max_network_adapters":-1,"max_per_user":0,"max_volumes":60,"memory":512,"nics":null,"os_arch":"x86_64","os_distribution":null,"os_type":"Linux","os_version":null,"property_groups":null,"reservation_policy":null,"security_groups":[],"security_tags":[],"storage":3}},"_archiveDays":5,"_leaseDays":null,"_number_of_instances":1,"corp192168110024":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*corp192168110024","data":{"_hasChildren":false}}}}`))
 
-	template, err := client.GetCatalogItem("e5dd4fba-45ed-4943-b1fc-7f96239286be")
+	template, err := client.GetCatalogItemRequestTemplate("e5dd4fba-45ed-4943-b1fc-7f96239286be")
 
 	if err != nil {
 		t.Errorf("Fail to get catalog Item template %v.", err)
@@ -99,7 +99,7 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests/template",
 		httpmock.NewErrorResponder(errors.New(`"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: ae368563-867e-40c1-a09e-0aeec55c9e81.","systemMessage":"Unable to find the specified catalog item in the service catalog: ae368563-867e-40c1-a09e-0aeec55c9e81.","moreInfoUrl":null}]}`)))
 
-	template, err = client.GetCatalogItem("e5dd4fba-45ed-4943-b1fc-7f96239286be")
+	template, err = client.GetCatalogItemRequestTemplate("e5dd4fba-45ed-4943-b1fc-7f96239286be")
 
 	if err == nil {
 		t.Errorf("Fail to generate exception")
@@ -110,7 +110,7 @@ func TestAPIClient_GetCatalogItem(t *testing.T) {
 	}
 }
 
-func TestAPIClient_RequestMachine(t *testing.T) {
+func TestAPIClient_RequestCatalogItem(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
@@ -122,7 +122,7 @@ func TestAPIClient_RequestMachine(t *testing.T) {
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests",
 		httpmock.NewStringResponder(201, `{"@type":"CatalogItemRequest","id":"b2907df7-6c36-4e30-9c62-a21f293b067a","iconId":"composition.blueprint.png","version":0,"requestNumber":null,"state":"SUBMITTED","description":null,"reasons":null,"requestedFor":"jason@corp.local","requestedBy":"jason@corp.local","organization":{"tenantRef":"vsphere.local","tenantLabel":null,"subtenantRef":"29a02ed9-7e63-4c77-8a15-c930afb0e3d8","subtenantLabel":null},"requestorEntitlementId":"e0d6ce92-6e23-4f75-a787-4564699b2895","preApprovalId":null,"postApprovalId":null,"dateCreated":"2017-08-10T13:38:25.395Z","lastUpdated":"2017-08-10T13:38:25.395Z","dateSubmitted":"2017-08-10T13:38:25.395Z","dateApproved":null,"dateCompleted":null,"quote":{"leasePeriod":null,"leaseRate":null,"totalLeaseCost":null},"requestCompletion":null,"requestData":{"entries":[{"key":"MySQL_1","value":{"type":"complex","componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"checkcloudclient*MySQL_1","values":{"entries":[{"key":"_hasChildren","value":{"type":"boolean","value":false}},{"key":"dbpassword","value":{"type":"secureString","value":"catalog~+gzbqycW+GiAqOREkOs7+mW9D4Og83AKc4FE46i2Z6Y="}}]}}},{"key":"Apache_Load_Balancer_1","value":{"type":"complex","componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"checkcloudclient*Apache_Load_Balancer_1","values":{"entries":[{"key":"http_node_ips","value":{"type":"multiple","elementTypeId":"STRING","items":[{"type":"string","value":"None"}]}},{"key":"_hasChildren","value":{"type":"boolean","value":false}},{"key":"http_proxy_port","value":{"type":"string","value":"8081"}},{"key":"tomcat_context","value":null},{"key":"JAVA_HOME","value":{"type":"string","value":"/opt/vmware-jre"}},{"key":"appsrv_routes","value":{"type":"multiple","elementTypeId":"STRING","items":[{"type":"string","value":"None"}]}},{"key":"use_ajp","value":{"type":"string","value":"NO"}},{"key":"http_node_port","value":{"type":"multiple","elementTypeId":"STRING","items":[{"type":"string","value":"8080"}]}},{"key":"http_port","value":{"type":"string","value":"80"}},{"key":"autogen_sticky_cookie","value":{"type":"string","value":"NO"}}]}}},{"key":"corp192168110024","value":{"type":"complex","componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"checkcloudclient*corp192168110024","values":{"entries":[{"key":"_hasChildren","value":{"type":"boolean","value":false}}]}}},{"key":"providerId","value":{"type":"string","value":"2fbaabc5-3a48-488a-9f2a-a42616345445"}},{"key":"subtenantId","value":{"type":"string","value":"29a02ed9-7e63-4c77-8a15-c930afb0e3d8"}},{"key":"vSphere__vCenter__Machine_2","value":{"type":"complex","componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"checkcloudclient*vSphere__vCenter__Machine_2","values":{"entries":[{"key":"snapshot_name","value":null},{"key":"source_machine","value":null},{"key":"memory","value":{"type":"integer","value":512}},{"key":"disks","value":{"type":"multiple","elementTypeId":"COMPLEX","items":[{"type":"complex","componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"values":{"entries":[{"key":"is_clone","value":{"type":"boolean","value":false}},{"key":"initial_location","value":{"type":"string","value":""}},{"key":"volumeId","value":{"type":"string","value":"0"}},{"key":"id","value":{"type":"integer","value":1502347498478}},{"key":"label","value":{"type":"string","value":""}},{"key":"userCreated","value":{"type":"boolean","value":true}},{"key":"storage_reservation_policy","value":{"type":"string","value":""}},{"key":"capacity","value":{"type":"integer","value":1}}]}}]}},{"key":"description","value":null},{"key":"storage","value":{"type":"integer","value":1}},{"key":"source_machine_name","value":null},{"key":"guest_customization_specification","value":null},{"key":"_hasChildren","value":{"type":"boolean","value":true}},{"key":"os_distribution","value":null},{"key":"reservation_policy","value":null},{"key":"max_network_adapters","value":{"type":"integer","value":-1}},{"key":"machine_prefix","value":null},{"key":"max_per_user","value":{"type":"integer","value":0}},{"key":"nics","value":null},{"key":"source_machine_vmsnapshot","value":null},{"key":"_allocation","value":{"type":"complex","componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"values":{"entries":[{"key":"machines","value":null}]}}},{"key":"display_location","value":{"type":"boolean","value":false}},{"key":"os_version","value":null},{"key":"os_arch","value":{"type":"string","value":"x86_64"}},{"key":"cpu","value":{"type":"integer","value":1}},{"key":"datacenter_location","value":null},{"key":"property_groups","value":null},{"key":"_cluster","value":{"type":"integer","value":1}},{"key":"security_groups","value":{"type":"multiple","elementTypeId":"ENTITY_REFERENCE","items":[]}},{"key":"max_volumes","value":{"type":"integer","value":60}},{"key":"os_type","value":{"type":"string","value":"Linux"}},{"key":"source_machine_external_snapshot","value":null},{"key":"security_tags","value":{"type":"multiple","elementTypeId":"ENTITY_REFERENCE","items":[]}}]}}},{"key":"_leaseDays","value":null},{"key":"providerBindingId","value":{"type":"string","value":"checkcloudclient"}},{"key":"_number_of_instances","value":{"type":"integer","value":1}},{"key":"vSphere__vCenter__Machine_1","value":{"type":"complex","componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"checkcloudclient*vSphere__vCenter__Machine_1","values":{"entries":[{"key":"snapshot_name","value":null},{"key":"source_machine","value":null},{"key":"memory","value":{"type":"integer","value":512}},{"key":"disks","value":{"type":"multiple","elementTypeId":"COMPLEX","items":[{"type":"complex","componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"values":{"entries":[{"key":"is_clone","value":{"type":"boolean","value":false}},{"key":"initial_location","value":{"type":"string","value":"hd-1"}},{"key":"volumeId","value":{"type":"string","value":"0"}},{"key":"id","value":{"type":"integer","value":1502345335122}},{"key":"label","value":{"type":"string","value":""}},{"key":"userCreated","value":{"type":"boolean","value":true}},{"key":"storage_reservation_policy","value":{"type":"string","value":""}},{"key":"capacity","value":{"type":"integer","value":3}}]}}]}},{"key":"description","value":null},{"key":"storage","value":{"type":"integer","value":3}},{"key":"source_machine_name","value":null},{"key":"guest_customization_specification","value":null},{"key":"_hasChildren","value":{"type":"boolean","value":true}},{"key":"os_distribution","value":null},{"key":"reservation_policy","value":null},{"key":"max_network_adapters","value":{"type":"integer","value":-1}},{"key":"machine_prefix","value":null},{"key":"max_per_user","value":{"type":"integer","value":0}},{"key":"nics","value":null},{"key":"source_machine_vmsnapshot","value":null},{"key":"_allocation","value":{"type":"complex","componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"values":{"entries":[{"key":"machines","value":null}]}}},{"key":"display_location","value":{"type":"boolean","value":false}},{"key":"os_version","value":null},{"key":"os_arch","value":{"type":"string","value":"x86_64"}},{"key":"cpu","value":{"type":"integer","value":1}},{"key":"datacenter_location","value":null},{"key":"property_groups","value":null},{"key":"_cluster","value":{"type":"integer","value":1}},{"key":"security_groups","value":{"type":"multiple","elementTypeId":"ENTITY_REFERENCE","items":[]}},{"key":"max_volumes","value":{"type":"integer","value":60}},{"key":"os_type","value":{"type":"string","value":"Linux"}},{"key":"source_machine_external_snapshot","value":null},{"key":"security_tags","value":{"type":"multiple","elementTypeId":"ENTITY_REFERENCE","items":[]}}]}}}]},"retriesRemaining":3,"requestedItemName":"myCompositeBlueprint","requestedItemDescription":"","components":null,"stateName":null,"catalogItemRef":{"id":"a3647254-3c50-4fe6-a630-69ae28bf3c81","label":"myCompositeBlueprint"},"catalogItemProviderBinding":{"bindingId":"vsphere.local!::!checkcloudclient","providerRef":{"id":"2fbaabc5-3a48-488a-9f2a-a42616345445","label":"Blueprint Service"}},"waitingStatus":"NOT_WAITING","executionStatus":"STARTED","approvalStatus":"PENDING","phase":"PENDING_PRE_APPROVAL"}`))
 
-	template, err := client.GetCatalogItem("e5dd4fba-45ed-4943-b1fc-7f96239286be")
+	template, err := client.GetCatalogItemRequestTemplate("e5dd4fba-45ed-4943-b1fc-7f96239286be")
 	if err != nil {
 		t.Errorf("Failed to get catalog item template %v.", err)
 	}
@@ -130,28 +130,28 @@ func TestAPIClient_RequestMachine(t *testing.T) {
 		t.Errorf("Catalog Item Id is empty.")
 	}
 
-	requestMachine, errorRequestMachine := client.RequestMachine(template)
+	catalogRequest, errorRequestCatalogItem := client.RequestCatalogItem(template)
 
-	if errorRequestMachine != nil {
-		t.Errorf("Failed to request the machine %v.", errorRequestMachine)
+	if errorRequestCatalogItem != nil {
+		t.Errorf("Failed to request the catalog item %v.", errorRequestCatalogItem)
 	}
 
-	if len(requestMachine.ID) == 0 {
-		t.Errorf("Failed to request machine.")
+	if len(catalogRequest.ID) == 0 {
+		t.Errorf("Failed to request catalog item.")
 	}
 
 	httpmock.RegisterResponder("POST", "http://localhost/catalog-service/"+
 		"api/consumer/entitledCatalogItems/e5dd4fba-45ed-4943-b1fc-7f96239286be/requests",
 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":20116,"source":null,"message":"Unable to find the specified catalog item in the service catalog: a3647254-3c50-4fe6-a636-9ae28bf3c811.","systemMessage":"Unable to find the specified catalog item in the service catalog: a3647254-3c50-4fe6-a636-9ae28bf3c811.","moreInfoUrl":null}]}`)))
 
-	requestMachine, errorRequestMachine = client.RequestMachine(template)
+	catalogRequest, errorRequestCatalogItem = client.RequestCatalogItem(template)
 
-	if errorRequestMachine == nil {
+	if errorRequestCatalogItem == nil {
 		t.Errorf("Failed to generate exception.")
 	}
 
-	if requestMachine != nil {
-		t.Errorf("Deploy machine request succeeded.")
+	if catalogRequest != nil {
+		t.Errorf("Catalog item request initiated successfully.")
 	}
 }
 func TestAPIClient_GetResourceViews(t *testing.T) {
@@ -244,29 +244,29 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 }
 
 func TestChangeValueFunction(t *testing.T) {
-	template_original := CatalogItemTemplate{}
-	template_backup := CatalogItemTemplate{}
+	request_template_original := CatalogItemRequestTemplate{}
+	request_template_backup := CatalogItemRequestTemplate{}
 	strJson := `{"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest","catalogItemId":"e5dd4fba-45ed-4943-b1fc-7f96239286be","requestedFor":"jason@corp.local","businessGroupId":"53619006-56bb-4788-9723-9eab79752cc1","description":null,"reasons":null,"data":{"CentOS_6.3":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*CentOS_6.3","data":{"_allocation":{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation","typeFilter":null,"data":{"machines":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Allocation.Machine","typeFilter":null,"data":{"machine_id":"","nics":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.Nic","typeFilter":null,"data":{"address":"","assignment_type":"Static","external_address":"","id":null,"load_balancing":null,"network":null,"network_profile":null}}]}}]}},"_cluster":1,"_hasChildren":false,"cpu":1,"datacenter_location":null,"description":"Basic IaaS CentOS Machine","disks":[{"componentTypeId":"com.vmware.csp.iaas.blueprint.service","componentId":null,"classId":"Infrastructure.Compute.Machine.MachineDisk","typeFilter":null,"data":{"capacity":3,"custom_properties":null,"id":1450725224066,"initial_location":"","is_clone":true,"label":"Hard disk 1","storage_reservation_policy":"","userCreated":false,"volumeId":0}}],"guest_customization_specification":"CentOS","max_network_adapters":-1,"max_per_user":0,"max_volumes":60,"memory":512,"nics":null,"os_arch":"x86_64","os_distribution":null,"os_type":"Linux","os_version":null,"property_groups":null,"reservation_policy":null,"security_groups":[],"security_tags":[],"storage":3}},"_archiveDays":5,"_leaseDays":null,"_number_of_instances":1,"corp192168110024":{"componentTypeId":"com.vmware.csp.component.cafe.composition","componentId":null,"classId":"Blueprint.Component.Declaration","typeFilter":"CentOS63*corp192168110024","data":{"_hasChildren":false}}}}`
-	json.Unmarshal([]byte(strJson), &template_original)
-	json.Unmarshal([]byte(strJson), &template_backup)
+	json.Unmarshal([]byte(strJson), &request_template_original)
+	json.Unmarshal([]byte(strJson), &request_template_backup)
 	var flag bool
 
-	template_original.Data, flag = changeTemplateValue(template_original.Data, "false_field", 1000)
+	request_template_original.Data, flag = replaceValueInRequestTemplate(request_template_original.Data, "false_field", 1000)
 	if flag != false {
 		t.Errorf("False value updated")
 	}
 
-	eq := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	eq := reflect.DeepEqual(request_template_backup.Data, request_template_original.Data)
 	if !eq {
 		t.Errorf("False value updated")
 	}
 
-	template_original.Data, flag = changeTemplateValue(template_original.Data, "storage", 1000)
+	request_template_original.Data, flag = replaceValueInRequestTemplate(request_template_original.Data, "storage", 1000)
 	if flag == false {
 		t.Errorf("Failed to update interface value")
 	}
 
-	eq2 := reflect.DeepEqual(template_backup.Data, template_original.Data)
+	eq2 := reflect.DeepEqual(request_template_backup.Data, request_template_original.Data)
 	if eq2 {
 		t.Errorf("Failed to update interface value")
 	}
