@@ -333,9 +333,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	sleepFor := 30
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor)*time.Second)
-
-		readResource(d, meta)
-
+		readError := readResource(d, meta)
+		if readError != nil {
+			return readError
+		}
 		if d.Get("request_status") == "SUCCESSFUL" {
 			return nil
 		}
@@ -346,6 +347,16 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			return fmt.Errorf("instance got failed while creating." +
 				" kindly check detail for more information")
 		}
+		//rejection handling if approval policy applied to provisioning
+		//and request is rejected
+		if d.Get("request_status") == "REJECTED" {
+			//If request gets rejected then resource won't get added into state file
+			d.SetId("")
+			return fmt.Errorf("Resource provisioning request rejected")
+		}
+	}
+	if d.Get("request_status") == "PENDING_PRE_APPROVAL" {
+		return fmt.Errorf("Request is not approved yet")
 	}
 	if d.Get("request_status") == "IN_PROGRESS" {
 		//If request is in_progress state during the time then
@@ -534,6 +545,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
+	}
+	if d.Get("request_status") == "REJECTED" {
+		//If request gets rejected then resource won't get added into state file
+		d.SetId("")
+		return fmt.Errorf("Resource provisioning request rejected")
 	}
 
 	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
