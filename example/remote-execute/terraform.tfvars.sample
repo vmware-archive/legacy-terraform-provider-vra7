@@ -1,0 +1,19 @@
+username = "username"
+
+password = "password"
+
+tenant = "tenant"
+
+host = "https://host"
+
+catalog_name = "Test Catalog"
+
+description = "Terraform test"
+
+count = "2"
+
+extra_disk = "5"
+
+ssh_user = "root"
+
+ssh_password = "12345"

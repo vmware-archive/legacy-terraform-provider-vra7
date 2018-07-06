@@ -560,6 +560,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 				return err
 			}
 			childConfig[componentName] = resourceActionTemplate.Data
+
+			// get IP address
+			if ipAddress, ok := resourceSpecificData["ip_address"]; ok {
+				childConfig[componentName].(map[string]interface{})["ip_address"] = ipAddress.(string)
+			}
 		}
 	}
 
@@ -614,8 +619,9 @@ func updateResourceConfigurationMap(
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
 				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
-				if updatedValue != currentValue {
-					configValue1 = updatedValue
+
+				if updatedValue != nil && updatedValue != currentValue {
+					resourceConfiguration[configKey1] = updatedValue
 					changed = true
 				}
 			}
