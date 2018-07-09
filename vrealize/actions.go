@@ -93,37 +93,3 @@ func (s byLength) Len() int {
 func (s byLength) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
-
-//getScaleInActionTemplate returns scale in resource action template from provided resource comfiguration template
-func (c *APIClient) getScaleInActionTemplate(resourceData *ResourceView) (*ActionTemplate, *ResourceView, error) {
-	//Set destroy resource URL label
-	actionURL := "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
-	//Set get action URL function call
-	return c.GetActionTemplate(resourceData, actionURL)
-}
-
-//getScaleInActionPostURL returns scale in resource action URL
-//Which is use to set actual POST call of scale in deployment
-func (c *APIClient) getScaleInActionPostURL(resourceData *ResourceView) string {
-	//Set destroy resource URL label
-	actionURL := "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
-	//Set get action URL function call
-	return getactionURL(resourceData, actionURL)
-}
-
-//getScaleOutActionTemplate returns scale out resource action URL
-//Which is use to set actual POST call of scale out deployment
-func (c *APIClient) getScaleOutActionPostURL(resourceData *ResourceView) string {
-	//Set destroy resource URL label
-	actionURL := "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
-	//Set get action URL function call
-	return getactionURL(resourceData, actionURL)
-}
-
-//getScaleOutActionPostURL returns scale out resource action template from provided resource comfiguration template
-func (c *APIClient) getScaleOutActionTemplate(resourceData *ResourceView) (*ActionTemplate, *ResourceView, error) {
-	//Set destroy resource URL label
-	actionURL := "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
-	//Set get action URL function call
-	return c.GetActionTemplate(resourceData, actionURL)
-}

@@ -165,14 +165,6 @@ func setResourceSchema() map[string]*schema.Schema {
 				Elem:     schema.TypeString,
 			},
 		},
-		"scale_resource": {
-			Type: schema.TypeMap,
-			Elem: &schema.Schema{
-				Type: schema.TypeFloat,
-			},
-			Computed: true,
-			Optional: true,
-		},
 	}
 }
 
@@ -225,10 +217,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// If catalog_name and catalog_id both not provided then return an error
 	if len(d.Get("catalog_name").(string)) <= 0 && len(d.Get("catalog_id").(string)) <= 0 {
 		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
-	}
-
-	if d.Get("scale_resource") != nil {
-		d.Set("scale_resource", nil)
 	}
 
 	// If catalog item name is provided then get catalog item ID using name for further process
@@ -431,117 +419,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	//Get client handle
 	vRAClient := meta.(*APIClient)
 
-	//Check if resource scaling configuration has a change
-	if d.HasChange("scale_resource") {
-		//Make sure deployment is in successful state before scaling operation
-		if d.Get("request_status") != "SUCCESSFUL" {
-			return fmt.Errorf("request_status needs to be in SUCCESSFUL for scaling changes")
-		}
-		templateResources, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
-		if errTemplate != nil {
-			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
-		}
-		//scale in code start
-		scaleInActionTemplate, _, scaleInActionError := vRAClient.getScaleInActionTemplate(templateResources)
-		if scaleInActionError != nil {
-			return fmt.Errorf("Resource view failed to load:  %v", scaleInActionError)
-		}
-		scaleInResourceConfiguration, _ := scaleInActionTemplate.Data.(map[string]interface{})
-		_, newScaleInData := d.GetChange("scale_resource")
-		scaleInItemData := newScaleInData.(map[string]interface{})
-		scaleInFlag := false
-		//Iterate over items available for scaling
-		for item := range scaleInResourceConfiguration {
-			itemData := scaleInResourceConfiguration[item].(map[string]interface{})
-			itemDataCluster := itemData["data"].(map[string]interface{})
-			_cluster, _ := itemDataCluster["_cluster"].(float64)
-			//Check if configuration provided is valid or not
-			if scaleInItemData[item] == nil {
-				return fmt.Errorf("item missing:" +
-					"either item is missing from template or wrong name provided in configuration")
-			}
-			changedValues, _ := strconv.ParseFloat(scaleInItemData[item].(string), 64)
-			//Check for specific resource change
-			//This is to validate where it should go for scaleIn or not
-			if changedValues < _cluster {
-				scaleInFlag = true
-				itemDataCluster["_cluster"] = changedValues
-				itemData["data"] = itemDataCluster
-				scaleInResourceConfiguration[item] = itemData
-			}
-		}
-		//If updates are available for scaleIn then proceed for scaleIn
-		if scaleInFlag == true {
-			PostURL := vRAClient.getScaleInActionPostURL(templateResources)
-			actionResponse := new(ActionResponseTemplate)
-			apiError := new(APIError)
-			scaleInActionTemplate.Data = scaleInResourceConfiguration
-
-			//Set a REST call for scaleIn resource items
-			_, err := vRAClient.HTTPClient.New().Post(PostURL).
-				BodyJSON(scaleInActionTemplate).Receive(actionResponse, apiError)
-
-			if err != nil {
-				return err
-			}
-			if !apiError.isEmpty() {
-				return apiError
-			}
-
-		}
-		//scale in code end
-		//scale out code start
-		scaleOutActionTemplate, _, ScaleOutActionError := vRAClient.getScaleInActionTemplate(templateResources)
-		if ScaleOutActionError != nil {
-			return fmt.Errorf("Resource view failed to load:  %v", ScaleOutActionError)
-		}
-		scaleOutResourceConfiguration, _ := scaleOutActionTemplate.Data.(map[string]interface{})
-		_, newScaleOutData := d.GetChange("scale_resource")
-		scaleOutItemData := newScaleOutData.(map[string]interface{})
-		scaleOutFlag := false
-		//Iterate over items available for scaling
-		for item := range scaleOutResourceConfiguration {
-			itemData := scaleOutResourceConfiguration[item].(map[string]interface{})
-			itemDataCluster := itemData["data"].(map[string]interface{})
-			_cluster, _ := itemDataCluster["_cluster"].(float64)
-			//Check if configuration provided is valid or not
-			if scaleOutItemData[item] == nil {
-				return fmt.Errorf("item missing:" +
-					"either item is missing from template or wrong name provided in configuration")
-			}
-			changedValues, _ := strconv.ParseFloat(scaleOutItemData[item].(string), 64)
-			//Check for specific resource change
-			//This is to validate where it should go for scaleOut or not
-			if changedValues > _cluster {
-				scaleOutFlag = true
-				itemDataCluster["_cluster"] = changedValues
-				itemData["data"] = itemDataCluster
-				scaleOutResourceConfiguration[item] = itemData
-			}
-		}
-		//If updates are available for scaleIn then proceed for scaleOut
-		if scaleOutFlag == true {
-			PostURL := vRAClient.getScaleOutActionPostURL(templateResources)
-			actionResponse := new(ActionResponseTemplate)
-			apiError := new(APIError)
-			scaleOutActionTemplate.Data = scaleOutResourceConfiguration
-
-			//Set a REST call for scaleIn resource items
-			_, err := vRAClient.HTTPClient.New().Post(PostURL).
-				BodyJSON(scaleOutActionTemplate).Receive(actionResponse, apiError)
-
-			if err != nil {
-				return err
-			}
-			if !apiError.isEmpty() {
-				return apiError
-			}
-
-		}
-		//scale out code end
-
-	}
-
 	//If any change made in resource_configuration.
 	if d.HasChange("resource_configuration") {
 		//Read resource template
@@ -575,7 +452,12 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				configChanged := false
 				returnFlag := false
+				scaleCluster := false
 				for configKey := range resourceConfiguration {
+					if strings.HasSuffix(configKey, "_cluster") {
+						scaleCluster = true
+						continue
+					}
 					//compare resource list (resource_name) with user configuration fields
 					if strings.HasPrefix(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
@@ -597,6 +479,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					//delete(resourceConfiguration, configKey)
 				}
 				//If template value got changed then set post call and update resource child
+				if scaleCluster == true {
+					if scalingError := scaleVMs(d, meta); scalingError != nil {
+						return scalingError
+					}
+				}
 				if configChanged != false {
 					err := postResourceConfig(
 						d,
@@ -612,6 +499,142 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	readResource(d, meta)
 	return nil
+}
+
+
+func scaleVMs(d *schema.ResourceData, meta interface{}) error {
+	catalogItemRequestID := d.Id()
+	vRAClient := meta.(*APIClient)
+
+	oData, nData := d.GetChange("resource_configuration")
+	oldData := oData.(map[string]interface{})
+	newData := nData.(map[string]interface{})
+	updatedData := oData.(map[string]interface{})
+
+	linkedList, actionLinkErr := getResourceScalingActionLinks(vRAClient, catalogItemRequestID)
+	if actionLinkErr != nil {
+		panic(d)
+	}
+
+	var ScaleInCall = linkedList[0]
+	var ScaleOutCall = linkedList[1]
+	var ScaleInTemplate = linkedList[2]
+	var ScaleOutTemplate = linkedList[3]
+
+	scaleInActionTemplate, ScaleOutActionTemplate, err := getDeploymentScalingTemplates(vRAClient, ScaleInTemplate, ScaleOutTemplate)
+	if err != nil {
+		return err
+	}
+
+	scaleInData := scaleInActionTemplate.Data.(map[string]interface{})
+	scaleOutData := ScaleOutActionTemplate.Data.(map[string]interface{})
+	ScaleInModified := false
+	ScaleOutModified := false
+	for key, value := range newData {
+		oldValue := oldData[key].(string)
+		newValue := value.(string)
+		if strings.HasSuffix(key, "_cluster") && newValue != oldValue {
+			updatedData[key] = newValue
+			componentName := strings.TrimSuffix(key, "._cluster")
+			if  newValue < oldValue {
+				scaleInData[componentName].(map[string]interface{})["data"].(map[string]interface{})["_cluster"] = newValue
+				ScaleInModified = true
+			}else{
+				scaleOutData[componentName].(map[string]interface{})["data"].(map[string]interface{})["_cluster"] = newValue
+				ScaleOutModified = true
+			}
+		}
+	}
+
+	if ScaleInModified == true {
+		scaleInActionTemplate.Data = scaleInData
+		ScaleOutActionTemplate.Data = scaleOutData
+
+		resourceActionTemplate1 := new(ResourceActionTemplate)
+		apiError1 := new(APIError)
+
+		response1, _ := vRAClient.HTTPClient.New().Post(ScaleInCall).
+			BodyJSON(scaleInActionTemplate).Receive(resourceActionTemplate1, apiError1)
+
+		if response1.StatusCode != 201 {
+			panic(d)
+			return apiError1
+		}
+	}
+	if ScaleOutModified == true {
+		scaleInActionTemplate.Data = scaleInData
+		ScaleOutActionTemplate.Data = scaleOutData
+
+		resourceActionTemplate1 := new(ResourceActionTemplate)
+		apiError1 := new(APIError)
+
+		response1, _ := vRAClient.HTTPClient.New().Post(ScaleOutCall).
+			BodyJSON(ScaleOutActionTemplate).Receive(resourceActionTemplate1, apiError1)
+
+		if response1.StatusCode != 201 {
+			panic(d)
+			return apiError1
+		}
+	}
+	d.Set("resource_configuration", updatedData)
+	return nil
+}
+
+func getResourceScalingActionLinks(vRAClient *APIClient, catalogItemRequestID string) ([]string, error) {
+	var linkList []string
+	const ScaleInCallRel = "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
+	const ScaleOutCallRel = "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
+	const ScaleInTemplateRel = "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
+	const ScaleOutTemplateRel = "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
+
+	//Check if resource scaling configuration has a change
+	deploymentState, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
+	if errTemplate != nil {
+		return nil, fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+	}
+
+	for _, value := range deploymentState.Content {
+		resourceMap := value.(map[string]interface{})
+		if resourceMap["resourceType"] == "composition.resource.type.deployment" {
+			resourceSpecificLinks := resourceMap["links"].([]interface{})
+			linkList = []string{
+				readActionLink(resourceSpecificLinks, ScaleInCallRel),
+				readActionLink(resourceSpecificLinks, ScaleOutCallRel),
+				readActionLink(resourceSpecificLinks, ScaleInTemplateRel),
+				readActionLink(resourceSpecificLinks, ScaleOutTemplateRel),
+			}
+			break
+		}
+	}
+	return linkList, nil
+}
+
+func getDeploymentScalingTemplates(c *APIClient, ScaleInTemplate string, ScaleOutTemplate string) (*ActionTemplate, *ActionTemplate, error) {
+
+	apiError1 := new(APIError)
+	apiError2 := new(APIError)
+	actionTemplate1 := new(ActionTemplate)
+	actionTemplate2 := new(ActionTemplate)
+
+	_, err1 := c.HTTPClient.New().Get(ScaleInTemplate).Receive(actionTemplate1, apiError1)
+
+	if err1 != nil {
+		return nil, nil, err1
+	}
+	if !apiError1.isEmpty() {
+		return nil, nil, apiError1
+	}
+
+	_, err2 := c.HTTPClient.New().Get(ScaleOutTemplate).Receive(actionTemplate2, apiError2)
+
+	if err2 != nil {
+		return nil, nil, err2
+	}
+	if !apiError2.isEmpty() {
+		return nil, nil, apiError2
+	}
+
+	return actionTemplate1, actionTemplate2, nil
 }
 
 func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate *ResourceActionTemplate, meta interface{}) error {
