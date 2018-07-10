@@ -557,7 +557,6 @@ func scaleVMs(d *schema.ResourceData, meta interface{}) error {
 			BodyJSON(scaleInActionTemplate).Receive(resourceActionTemplate1, apiError1)
 
 		if response1.StatusCode != 201 {
-			panic(d)
 			return apiError1
 		}
 	}
@@ -572,7 +571,6 @@ func scaleVMs(d *schema.ResourceData, meta interface{}) error {
 			BodyJSON(ScaleOutActionTemplate).Receive(resourceActionTemplate1, apiError1)
 
 		if response1.StatusCode != 201 {
-			panic(d)
 			return apiError1
 		}
 	}
