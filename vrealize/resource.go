@@ -386,28 +386,53 @@ func readActionLink(resourceSpecificLinks []interface{}, reconfigGetLinkTitleRel
 	return actionLink
 }
 
-func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) map[string]interface{} {
-
-	var urlMap map[string]interface{}
-	urlMap = map[string]interface{}{}
+func updateVM(resourceMap map[string]interface{}, resourceConfiguration map[string]interface{}, d *schema.ResourceData, meta interface{}) error {
+	vRAClient := meta.(*APIClient)
+	resourceSpecificLinks := resourceMap["links"].([]interface{})
 	const reconfigGetLinkTitleRel = "GET Template: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
 		"machine.Reconfigure}"
 	const reconfigPostLinkTitleRel = "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name." +
 		"machine.Reconfigure}"
+	reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
+	reconfigPostLink := readActionLink(resourceSpecificLinks, reconfigPostLinkTitleRel)
 
-	for _, value := range GetDeploymentStateData.Content {
-		resourceMap := value.(map[string]interface{})
-		if resourceMap["resourceType"] == "Infrastructure.Virtual" {
-			resourceSpecificData := resourceMap["data"].(map[string]interface{})
-			resourceSpecificLinks := resourceMap["links"].([]interface{})
-			componentName := resourceSpecificData["Component"].(string)
+	resourceSpecificData := resourceMap["data"].(map[string]interface{})
+	componentName := resourceSpecificData["Component"].(string)
+	resourceActionTemplate := new(ResourceActionTemplate)
+	apiError := new(APIError)
+	//Get reource child reconfiguration template json
+	response, err := vRAClient.HTTPClient.New().Get(reconfigGetLink).
+		Receive(resourceActionTemplate, apiError)
+	response.Close = true
 
-			reconfigGetLink := readActionLink(resourceSpecificLinks, reconfigGetLinkTitleRel)
-			reconfigPostLink := readActionLink(resourceSpecificLinks, reconfigPostLinkTitleRel)
-			urlMap[componentName] = []string{reconfigGetLink, reconfigPostLink}
+	if !apiError.isEmpty() {
+		return apiError
+	}
+	if err != nil {
+		return err
+	}
+
+	returnFlag := false
+	configChanged := false
+	for key, value := range resourceConfiguration {
+		if strings.HasPrefix(key, componentName+".") {
+			//If user_configuration contains resource_list element
+			// then split user configuration key into resource_name and field_name
+			componentName := strings.Split(key, componentName+".")[1]
+			resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(resourceActionTemplate.Data, componentName, value)
+			if returnFlag == true {
+				configChanged = true
+			}
 		}
 	}
-	return urlMap
+
+	if configChanged != false {
+		err := postResourceConfig(d, reconfigPostLink, resourceActionTemplate, meta)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Terraform call - terraform apply
@@ -428,61 +453,13 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		}
 
 		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
-		VMReconfigActionUrls := readVMReconfigActionUrls(GetDeploymentStateData)
-
 		//Iterate over the resources in the deployment
 		for _, value := range GetDeploymentStateData.Content {
 			resourceMap := value.(map[string]interface{})
 			if resourceMap["resourceType"] == "Infrastructure.Virtual" {
-				resourceSpecificData := resourceMap["data"].(map[string]interface{})
-				//resourceSpecificLinks := resourceMap["links"].([]interface{})
-				componentName := resourceSpecificData["Component"].(string)
-				resourceActionTemplate := new(ResourceActionTemplate)
-				apiError := new(APIError)
-				//Get reource child reconfiguration template json
-				response, err := vRAClient.HTTPClient.New().Get(VMReconfigActionUrls[componentName].([]string)[0]).
-					Receive(resourceActionTemplate, apiError)
-				response.Close = true
-
-				if !apiError.isEmpty() {
-					return apiError
-				}
-				if err != nil {
-					return err
-				}
-				configChanged := false
-				returnFlag := false
-				for configKey := range resourceConfiguration {
-					//compare resource list (resource_name) with user configuration fields
-					if strings.HasPrefix(configKey, componentName+".") {
-						//If user_configuration contains resource_list element
-						// then split user configuration key into resource_name and field_name
-						nameList := strings.Split(configKey, componentName+".")
-						//actionResponseInterface := actionResponse.(map[string]interface{})
-						//Function call which changes the template field values with  user values
-						//Replace existing values with new values in resource child template
-						resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(
-							resourceActionTemplate.Data,
-							nameList[1],
-							resourceConfiguration[configKey])
-						if returnFlag == true {
-							configChanged = true
-						}
-
-					}
-					//delete used user configuration
-					//delete(resourceConfiguration, configKey)
-				}
-				//If template value got changed then set post call and update resource child
-				if configChanged != false {
-					err := postResourceConfig(
-						d,
-						VMReconfigActionUrls[componentName].([]string)[1],
-						resourceActionTemplate,
-						meta)
-					if err != nil {
-						return err
-					}
+				updateErr := updateVM(resourceMap, resourceConfiguration, d, meta)
+				if updateErr != nil {
+					return updateErr
 				}
 			}
 		}
