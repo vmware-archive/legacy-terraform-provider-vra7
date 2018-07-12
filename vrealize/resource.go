@@ -428,7 +428,7 @@ func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) map[string]i
 
 // updateDeploymentLeaseTime function updates a end time of deployment lease
 // It returns error on failure at any step of lease time update
-func updateDeploymentLeaseTime(d *schema.ResourceData, meta interface{}) error {
+func updateDeploymentLease(d *schema.ResourceData, meta interface{}) error {
 	//Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 	//Get client handle
@@ -468,7 +468,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 
 	// Check lease date changes
 	if d.HasChange("lease.end") {
-		leaseTimeErr := updateDeploymentLeaseTime(d, meta)
+		leaseTimeErr := updateDeploymentLease(d, meta)
 		if leaseTimeErr != nil {
 			// Reset lease dates and return error
 			// if error is returned from updateDeploymentLeaseTime()
