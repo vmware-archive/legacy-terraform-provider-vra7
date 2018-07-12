@@ -110,11 +110,13 @@ func setResourceSchema() map[string]*schema.Schema {
 		"catalog_name": {
 			Type:     schema.TypeString,
 			Optional: true,
+			ForceNew: true,
 		},
 		"catalog_id": {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
+			ForceNew: true,
 		},
 		"businessgroup_id": {
 			Type:     schema.TypeString,
@@ -129,13 +131,27 @@ func setResourceSchema() map[string]*schema.Schema {
 		"request_status": {
 			Type:     schema.TypeString,
 			Computed: true,
-			ForceNew: true,
 		},
 		"failed_message": {
 			Type:     schema.TypeString,
 			Computed: true,
-			ForceNew: true,
 			Optional: true,
+		},
+		"lease": &schema.Schema{
+			Type: schema.TypeMap,
+			Optional: true,
+			Elem: &schema.Resource{
+				Schema: map[string]*schema.Schema{
+					"start": &schema.Schema{
+						Optional: true,
+						Type: schema.TypeString,
+					},
+					"end": &schema.Schema{
+						Optional: true,
+						Type: schema.TypeString,
+					},
+				},
+			},
 		},
 		"deployment_configuration": {
 			Type:     schema.TypeMap,
@@ -410,6 +426,37 @@ func readVMReconfigActionUrls(GetDeploymentStateData *ResourceView) map[string]i
 	return urlMap
 }
 
+// updateDeploymentLeaseTime function updates a end time of deployment lease
+// It returns error on failure at any step of lease time update
+func updateDeploymentLeaseTime(d *schema.ResourceData, meta interface{}) error {
+	//Get the ID of the catalog request that was used to provision this Deployment.
+	catalogItemRequestID := d.Id()
+	//Get client handle
+	vRAClient := meta.(*APIClient)
+
+	// Get deployment details
+	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
+	if errTemplate != nil {
+		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+	}
+
+	// Get change lease GET/POST links
+	leaseActionLinks := vRAClient.getDeploymentLeaseActionLinks(GetDeploymentStateData)
+	// Get change lease template
+	leaseActionTemplate, err := getResourceConfigTemplate(leaseActionLinks["template_url"].(string), d, meta)
+	if err != nil {
+		return fmt.Errorf("lease template loeading failed:  %v", err)
+	}
+
+	// Update template value
+	leaseActionTemplate.Data["provider-ExpirationDate"] = d.Get("lease.end")
+	// POST changes
+	changeLeaseErr := postResourceConfig(d, leaseActionLinks["post_url"].(string), leaseActionTemplate, meta)
+	if changeLeaseErr != nil {
+		return fmt.Errorf("change lease post call failed:  %v", changeLeaseErr)
+	}
+	return nil
+}
 // Terraform call - terraform apply
 // This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
 // The update is performed on the Deployment using supported (day-2) actions.
@@ -419,6 +466,17 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	//Get client handle
 	vRAClient := meta.(*APIClient)
 
+	// Check lease date changes
+	if d.HasChange("lease.end") {
+		leaseTimeErr := updateDeploymentLeaseTime(d, meta)
+		if leaseTimeErr != nil {
+			// Reset lease dates and return error
+			// if error is returned from updateDeploymentLeaseTime()
+			oldData, _ := d.GetChange("lease")
+			d.Set("lease", oldData)
+			return leaseTimeErr
+		}
+	}
 	//If any change made in resource_configuration.
 	if d.HasChange("resource_configuration") {
 		//Read resource template
@@ -549,6 +607,9 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 	for _, value := range GetDeploymentStateData.Content {
 		resourceMap := value.(map[string]interface{})
+		if resourceMap["resourceType"] == "composition.resource.type.deployment" {
+			d.Set("lease", resourceMap["lease"].(map[string]interface{}))
+		}
 		resourceSpecificData := resourceMap["data"].(map[string]interface{})
 		resourceSpecificLinks := resourceMap["links"].([]interface{})
 		if resourceSpecificData["Component"] != nil {
