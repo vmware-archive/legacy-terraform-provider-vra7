@@ -93,3 +93,60 @@ func (s byLength) Len() int {
 func (s byLength) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
+func (c *APIClient) getDeploymentScalingTemplates(ScaleInTemplate string, ScaleOutTemplate string) (*ActionTemplate, *ActionTemplate, error) {
+
+	apiError1 := new(APIError)
+	apiError2 := new(APIError)
+	actionTemplate1 := new(ActionTemplate)
+	actionTemplate2 := new(ActionTemplate)
+
+	_, err1 := c.HTTPClient.New().Get(ScaleInTemplate).Receive(actionTemplate1, apiError1)
+
+	if err1 != nil {
+		return nil, nil, err1
+	}
+	if !apiError1.isEmpty() {
+		return nil, nil, apiError1
+	}
+
+	_, err2 := c.HTTPClient.New().Get(ScaleOutTemplate).Receive(actionTemplate2, apiError2)
+
+	if err2 != nil {
+		return nil, nil, err2
+	}
+	if !apiError2.isEmpty() {
+		return nil, nil, apiError2
+	}
+
+	return actionTemplate1, actionTemplate2, nil
+}
+
+func (vRAClient *APIClient) getResourceScalingActionLinks(catalogItemRequestID string) ([]string, error) {
+	var linkList []string
+	const ScaleInCallRel = "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
+	const ScaleOutCallRel = "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
+	const ScaleInTemplateRel = "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scalein.name}"
+	const ScaleOutTemplateRel = "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.scaleout.name}"
+
+	//Check if resource scaling configuration has a change
+	deploymentState, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
+	if errTemplate != nil {
+		return nil, fmt.Errorf("Resource view failed to load:  %v", errTemplate)
+	}
+
+	for _, value := range deploymentState.Content {
+		resourceMap := value.(map[string]interface{})
+		if resourceMap["resourceType"] == "composition.resource.type.deployment" {
+			resourceSpecificLinks := resourceMap["links"].([]interface{})
+			linkList = []string{
+				readActionLink(resourceSpecificLinks, ScaleInCallRel),
+				readActionLink(resourceSpecificLinks, ScaleOutCallRel),
+				readActionLink(resourceSpecificLinks, ScaleInTemplateRel),
+				readActionLink(resourceSpecificLinks, ScaleOutTemplateRel),
+			}
+			break
+		}
+	}
+	return linkList, nil
+}
