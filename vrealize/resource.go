@@ -331,34 +331,42 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
+	var request_status string
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor)*time.Second)
 
 		readResource(d, meta)
 
-		if d.Get("request_status") == "SUCCESSFUL" {
+		request_status := d.Get("request_status")
+		log.Printf("Checking to see if resource is created. Status: %s.", request_status)
+		if request_status == "SUCCESSFUL" {
+			log.Printf("Resource creation SUCCESSFUL.")
 			return nil
-		}
-		if d.Get("request_status") == "FAILED" {
+		} else if request_status == "FAILED" {
 			//If request is failed during the time then
 			//unset resource details from state.
 			d.SetId("")
-			return fmt.Errorf("instance got failed while creating." +
-				" kindly check detail for more information")
+			return fmt.Errorf("Resource creation FAILED.")
+		} else if request_status == "IN_PROGRESS"{
+			log.Printf("Resource creation is still IN PROGRESS. Continuing to wait ...")
+		} else {
+			log.Printf("Resource creation request status: %s. Continuing to wait ...", request_status)
 		}
 	}
-	if d.Get("request_status") == "IN_PROGRESS" {
+	
+	if request_status == "IN_PROGRESS" {
 		//If request is in_progress state during the time then
 		//keep resource details in state files and throw an error
 		//so that the child resource won't go for create call.
 		//If execution gets timed-out and status is in progress
-		//then dependent machine won't be get created in this iteration.
+		//then dependent machine won't get created in this iteration.
 		//A user needs to ensure that the status should be a success state
 		//using terraform refresh command and hit terraform apply again.
-		return fmt.Errorf("resource is still being created")
+		return fmt.Errorf("Resource creation is still IN PROGRESS, but we have timed out !!")
+	} else {
+		log.Printf("Resource creation request state is %s, and we have timed out !!", request_status)
+		return nil
 	}
-
-	return nil
 }
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
@@ -717,7 +725,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	sleepFor := 30
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor)*time.Second)
-
+		log.Printf("Checking to see if resource is deleted.");
 		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
