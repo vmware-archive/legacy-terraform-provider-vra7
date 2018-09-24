@@ -212,14 +212,6 @@
   revision = "fa9f258a92500514cc8e9c67020487709df92432"
 
 [[projects]]
-  digest = "1:51430c345f48c781f7f43146b574ec498c62c608bfff3715fef4c915d96ed4fc"
-  name = "github.com/hashicorp/logutils"
-  packages = ["."]
-  pruneopts = ""
-  revision = "a335183dfd075f638afcc820c90591ca3c97eba6"
-  version = "v1.0.0"
-
-[[projects]]
   digest = "1:b4261d9a27f7642710589ea084f5381cd737af75d8720f83b918c86e60902fe2"
   name = "github.com/hashicorp/terraform"
   packages = [
@@ -229,7 +221,6 @@
     "flatmap",
     "helper/hashcode",
     "helper/hilmapstructure",
-    "helper/logging",
     "helper/schema",
     "moduledeps",
     "plugin",
@@ -475,7 +466,6 @@
   analyzer-version = 1
   input-imports = [
     "github.com/dghubble/sling",
-    "github.com/hashicorp/terraform/helper/logging",
     "github.com/hashicorp/terraform/helper/schema",
     "github.com/hashicorp/terraform/plugin",
     "github.com/hashicorp/terraform/terraform",
