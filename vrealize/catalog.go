@@ -2,10 +2,10 @@ package vrealize
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
+
 
 //CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
 type CatalogItemRequestTemplate struct {
@@ -35,7 +35,7 @@ func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemId string) (*Catalo
 		"%s/requests/template",
 		catalogItemId)
 
-	log.Printf("GetCatalogItemRequestTemplate->path %v\n", path)
+	log.Info("GetCatalogItemRequestTemplate->path %v\n", path)
 
 	requestTemplate := new(CatalogItemRequestTemplate)
 	apiError := new(APIError)
@@ -50,7 +50,7 @@ func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemId string) (*Catalo
 		return nil, apiError
 	}
 	//Return catalog item template
-	log.Printf("GetCatalogItemRequestTemplate->requestTemplate %v\n", requestTemplate)
+	log.Info("GetCatalogItemRequestTemplate->requestTemplate %v\n", requestTemplate)
 	return requestTemplate, nil
 }
 
@@ -91,7 +91,7 @@ func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (interface{}, 
 func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, error) {
 	var catalogItemID string
 
-	log.Printf("readCatalogItemIdByName->catalog_name %v\n", catalogName)
+	log.Info("readCatalogItemIdByName->catalog_name %v\n", catalogName)
 
 	//Set a call to read number of catalogs from vRA
 	path := fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews")
