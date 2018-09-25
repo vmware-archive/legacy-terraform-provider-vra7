@@ -14,7 +14,7 @@ import (
 )
 
 var(
-	log = logging.MustGetLogger(utils.LoggerID)
+	log = logging.MustGetLogger(utils.LOGGER_ID)
 )
 
 //ResourceActionTemplate - is used to store information
