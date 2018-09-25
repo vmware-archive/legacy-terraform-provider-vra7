@@ -4,12 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/hashicorp/terraform/helper/schema"
-	"log"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 	"sort"
+	"github.com/vmware/terraform-provider-vra7/utils"
+	"github.com/op/go-logging"
+)
+
+var(
+	log = logging.MustGetLogger(utils.LOGGER_ID)
 )
 
 //ResourceActionTemplate - is used to store information
@@ -126,7 +131,7 @@ func setResourceSchema() map[string]*schema.Schema {
 			Optional: true,
 			Default:  15,
 		},
-		"request_status": {
+		utils.REQUEST_STATUS: {
 			Type:     schema.TypeString,
 			Computed: true,
 			ForceNew: true,
@@ -223,7 +228,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// else if catalog item id is provided then fetch catalog name
 	if len(d.Get("catalog_name").(string)) > 0 {
 		catalogItemID, returnErr := vRAClient.readCatalogItemIDByName(d.Get("catalog_name").(string))
-		log.Printf("createResource->catalog_id %v\n", catalogItemID)
+		log.Info("createResource->catalog_id %v\n", catalogItemID)
 		if returnErr != nil {
 			return fmt.Errorf("%v", returnErr)
 		}
@@ -244,14 +249,14 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	//Get request template for catalog item.
 	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get("catalog_id").(string))
-	log.Printf("createResource->requestTemplate %v\n", requestTemplate)
+	log.Info("createResource->requestTemplate %v\n", requestTemplate)
 
 	catalogConfiguration, _ := d.Get("catalog_configuration").(map[string]interface{})
 	for field1 := range catalogConfiguration {
 		requestTemplate.Data[field1] = catalogConfiguration[field1]
 
 	}
-	log.Printf("createResource->requestTemplate.Data %v\n", requestTemplate.Data)
+	log.Info("createResource->requestTemplate.Data %v\n", requestTemplate.Data)
 
 	if len(d.Get("businessgroup_id").(string)) > 0 {
 		requestTemplate.BusinessGroupID = d.Get("businessgroup_id").(string)
@@ -264,7 +269,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			componentNameList = append(componentNameList, field)
 		}
 	}
-	log.Printf("createResource->key_list %v\n", componentNameList)
+	log.Info("createResource->key_list %v\n", componentNameList)
 
 	// Arrange component names in descending order of text length.
 	// Component names are sorted this way because '.', which is used as a separator, may also occur within
@@ -307,11 +312,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		case "reasons":
 			requestTemplate.Reasons = depValue.(string)
 		default:
-			log.Printf("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
+			log.Info("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
 		}
 	}
 
-	log.Printf("Updated template - %v\n", requestTemplate.Data)
+	log.Info("Updated template - %v\n", requestTemplate.Data)
 
 	if err != nil {
 		return fmt.Errorf("Invalid CatalogItem ID %v", err)
@@ -327,7 +332,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Set request ID
 	d.SetId(catalogRequest.ID)
 	//Set request status
-	d.Set("request_status", "SUBMITTED")
+	d.Set(utils.REQUEST_STATUS, "SUBMITTED")
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
@@ -337,10 +342,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 		readResource(d, meta)
 
-		request_status := d.Get("request_status")
-		log.Printf("Checking to see if resource is created. Status: %s.", request_status)
+		request_status := d.Get(utils.REQUEST_STATUS)
+		log.Info("Checking to see if resource is created. Status: %s.", request_status)
 		if request_status == "SUCCESSFUL" {
-			log.Printf("Resource creation SUCCESSFUL.")
+			log.Info("Resource creation SUCCESSFUL.")
 			return nil
 		} else if request_status == "FAILED" {
 			//If request is failed during the time then
@@ -348,9 +353,9 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			d.SetId("")
 			return fmt.Errorf("Resource creation FAILED.")
 		} else if request_status == "IN_PROGRESS"{
-			log.Printf("Resource creation is still IN PROGRESS. Continuing to wait ...")
+			log.Info("Resource creation is still IN PROGRESS. Continuing to wait ...")
 		} else {
-			log.Printf("Resource creation request status: %s. Continuing to wait ...", request_status)
+			log.Info("Resource creation request status: %s. Continuing to wait ...", request_status)
 		}
 	}
 	
@@ -364,7 +369,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		//using terraform refresh command and hit terraform apply again.
 		return fmt.Errorf("Resource creation is still IN PROGRESS, but we have timed out !!")
 	} else {
-		log.Printf("Resource creation request state is %s, and we have timed out !!", request_status)
+		log.Info("Resource creation request state is %s, and we have timed out !!", request_status)
 		return nil
 	}
 }
@@ -538,7 +543,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
 	//Update resource request status in state file
-	d.Set("request_status", resourceTemplate.Phase)
+	d.Set(utils.REQUEST_STATUS, resourceTemplate.Phase)
 	//If request is failed then set failed message in state file
 	if resourceTemplate.Phase == "FAILED" {
 		d.Set("failed_message", resourceTemplate.RequestCompletion.CompletionDetails)
@@ -603,7 +608,7 @@ func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, m
 	}
 	if err != nil {
 		if err.Error() == "invalid character '<' looking for beginning of value" {
-			d.Set("request_status", "IN_PROGRESS")
+			d.Set(utils.REQUEST_STATUS, "IN_PROGRESS")
 			return nil, fmt.Errorf("resource is not yet ready to show up")
 		}
 		return nil, err
@@ -687,8 +692,8 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Resource not found")
 	}
 	//If resource create status is in_progress then skip delete call and through an exception
-	if d.Get("request_status").(string) != "SUCCESSFUL" {
-		if d.Get("request_status").(string) == "FAILED" {
+	if d.Get(utils.REQUEST_STATUS).(string) != "SUCCESSFUL" {
+		if d.Get(utils.REQUEST_STATUS).(string) == "FAILED" {
 			d.SetId("")
 			return nil
 		}
@@ -725,7 +730,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	sleepFor := 30
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor)*time.Second)
-		log.Printf("Checking to see if resource is deleted.");
+		log.Info("Checking to see if resource is deleted.");
 		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
@@ -851,11 +856,11 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 
 	jsonBody, jErr := json.Marshal(requestTemplate)
 	if jErr != nil {
-		log.Printf("Error marshalling request templat as JSON")
+		log.Error("Error marshalling request templat as JSON")
 		return nil, jErr
 	}
 
-	log.Printf("JSON Request Info: %s", jsonBody)
+	log.Info("JSON Request Info: %s", jsonBody)
 	//Set a REST call to create a machine
 	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(requestTemplate).
 		Receive(catalogRequest, apiError)

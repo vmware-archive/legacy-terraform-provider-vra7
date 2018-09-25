@@ -3,12 +3,11 @@ package vrealize
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
-
 	"github.com/dghubble/sling"
 )
+
 
 //APIClient - This struct is used to store information provided in .tf file under provider block
 //Later on, this stores bearToken after successful authentication and uses that token for next
@@ -83,7 +82,7 @@ func (c *APIClient) Authenticate() error {
 	}
 
 	if !apiError.isEmpty() {
-		log.Printf("%s\n", apiError.Error())
+		log.Errorf("%s\n", apiError.Error())
 		return fmt.Errorf("%s", apiError.Error())
 	}
 
