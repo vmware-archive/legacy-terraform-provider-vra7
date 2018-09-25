@@ -336,13 +336,14 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
-	var request_status string
+	request_status := ""
 	for i := 0; i < waitTimeout/sleepFor; i++ {
+		log.Info("Waiting for %d seconds before checking request status.", sleepFor)
 		time.Sleep(time.Duration(sleepFor)*time.Second)
 
 		readResource(d, meta)
 
-		request_status := d.Get(utils.REQUEST_STATUS)
+		request_status = d.Get(utils.REQUEST_STATUS).(string)
 		log.Info("Checking to see if resource is created. Status: %s.", request_status)
 		if request_status == "SUCCESSFUL" {
 			log.Info("Resource creation SUCCESSFUL.")
@@ -353,25 +354,20 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			d.SetId("")
 			return fmt.Errorf("Resource creation FAILED.")
 		} else if request_status == "IN_PROGRESS"{
-			log.Info("Resource creation is still IN PROGRESS. Continuing to wait ...")
+			log.Info("Resource creation is still IN PROGRESS.")
 		} else {
-			log.Info("Resource creation request status: %s. Continuing to wait ...", request_status)
+			log.Info("Resource creation request status: %s.", request_status)
 		}
 	}
-	
-	if request_status == "IN_PROGRESS" {
-		//If request is in_progress state during the time then
-		//keep resource details in state files and throw an error
-		//so that the child resource won't go for create call.
-		//If execution gets timed-out and status is in progress
-		//then dependent machine won't get created in this iteration.
-		//A user needs to ensure that the status should be a success state
-		//using terraform refresh command and hit terraform apply again.
-		return fmt.Errorf("Resource creation is still IN PROGRESS, but we have timed out !!")
-	} else {
-		log.Info("Resource creation request state is %s, and we have timed out !!", request_status)
-		return nil
-	}
+
+	//If request is in_progress state during the time then
+	//keep resource details in state files and throw an error
+	//so that the child resource won't go for create call.
+	//If execution gets timed-out and status is in progress
+	//then dependent machine won't get created in this iteration.
+	//A user needs to ensure that the status should be a success state
+	//using terraform refresh command and hit terraform apply again.
+	return fmt.Errorf("Resource creation has timed out !!")
 }
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
