@@ -461,7 +461,12 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				configChanged := false
 				returnFlag := false
+				scaleCluster := false
 				for configKey := range resourceConfiguration {
+					if strings.HasSuffix(configKey, "_cluster") {
+						scaleCluster = true
+						continue
+					}
 					//compare resource list (resource_name) with user configuration fields
 					if strings.HasPrefix(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
@@ -483,6 +488,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					//delete(resourceConfiguration, configKey)
 				}
 				//If template value got changed then set post call and update resource child
+				if scaleCluster == true {
+					if scalingError := scaleVMs(d, meta); scalingError != nil {
+						return scalingError
+					}
+				}
 				if configChanged != false {
 					err := postResourceConfig(
 						d,
@@ -497,6 +507,83 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 	readResource(d, meta)
+	return nil
+}
+
+
+func scaleVMs(d *schema.ResourceData, meta interface{}) error {
+	catalogItemRequestID := d.Id()
+	vRAClient := meta.(*APIClient)
+
+	oData, nData := d.GetChange("resource_configuration")
+	oldData := oData.(map[string]interface{})
+	newData := nData.(map[string]interface{})
+	updatedData := oData.(map[string]interface{})
+
+	linkedList, actionLinkErr := vRAClient.getResourceScalingActionLinks(catalogItemRequestID)
+	if actionLinkErr != nil {
+		panic(d)
+	}
+
+	var ScaleInCall = linkedList[0]
+	var ScaleOutCall = linkedList[1]
+	var ScaleInTemplate = linkedList[2]
+	var ScaleOutTemplate = linkedList[3]
+
+	scaleInActionTemplate, ScaleOutActionTemplate, err := vRAClient.getDeploymentScalingTemplates(ScaleInTemplate, ScaleOutTemplate)
+	if err != nil {
+		return err
+	}
+
+	scaleInData := scaleInActionTemplate.Data.(map[string]interface{})
+	scaleOutData := ScaleOutActionTemplate.Data.(map[string]interface{})
+	ScaleInModified := false
+	ScaleOutModified := false
+	for key, value := range newData {
+		oldValue := oldData[key].(string)
+		newValue := value.(string)
+		if strings.HasSuffix(key, "_cluster") && newValue != oldValue {
+			updatedData[key] = newValue
+			componentName := strings.TrimSuffix(key, "._cluster")
+			if  newValue < oldValue {
+				scaleInData[componentName].(map[string]interface{})["data"].(map[string]interface{})["_cluster"] = newValue
+				ScaleInModified = true
+			}else{
+				scaleOutData[componentName].(map[string]interface{})["data"].(map[string]interface{})["_cluster"] = newValue
+				ScaleOutModified = true
+			}
+		}
+	}
+
+	if ScaleInModified == true {
+		scaleInActionTemplate.Data = scaleInData
+		ScaleOutActionTemplate.Data = scaleOutData
+
+		resourceActionTemplate1 := new(ResourceActionTemplate)
+		apiError1 := new(APIError)
+
+		response1, _ := vRAClient.HTTPClient.New().Post(ScaleInCall).
+			BodyJSON(scaleInActionTemplate).Receive(resourceActionTemplate1, apiError1)
+
+		if response1.StatusCode != 201 {
+			return apiError1
+		}
+	}
+	if ScaleOutModified == true {
+		scaleInActionTemplate.Data = scaleInData
+		ScaleOutActionTemplate.Data = scaleOutData
+
+		resourceActionTemplate1 := new(ResourceActionTemplate)
+		apiError1 := new(APIError)
+
+		response1, _ := vRAClient.HTTPClient.New().Post(ScaleOutCall).
+			BodyJSON(ScaleOutActionTemplate).Receive(resourceActionTemplate1, apiError1)
+
+		if response1.StatusCode != 201 {
+			return apiError1
+		}
+	}
+	d.Set("resource_configuration", updatedData)
 	return nil
 }
 
