@@ -97,3 +97,30 @@ func (s byLength) Len() int {
 func (s byLength) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
+
+// getDeploymentLeaseActionLinks returns a MAP of GET/POST action links of change lease
+func (vRAClient *APIClient) getDeploymentLeaseActionLinks(resourceData *ResourceView) (map[string]interface{}) {
+	//Set resource power-off URL label
+	const templateRel = "GET Template: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changelease.name}"
+	const postRel = "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.changelease.name}"
+	//Set get action URL function call
+	actionData := vRAClient.GetDeploymentActionLinks(resourceData, templateRel, postRel)
+	return actionData
+}
+
+// GetDeploymentActionLinks determines change lease action links from resourceView template
+func (vRAClient *APIClient) GetDeploymentActionLinks(resourceData *ResourceView, templateRel string, postRel string) map[string]interface{}  {
+	data := map[string]interface{}{}
+	for _, value := range resourceData.Content {
+		resourceMap := value.(map[string]interface{})
+		if resourceMap["resourceType"] == "composition.resource.type.deployment" {
+			resourceSpecificLinks := resourceMap["links"].([]interface{})
+			data["template_url"] = readActionLink(resourceSpecificLinks, templateRel)
+			data["post_url"] = readActionLink(resourceSpecificLinks, postRel)
+			break
+		}
+
+	}
+	return data
+}
+
