@@ -299,8 +299,12 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//there are invalid resource config keys in the terraform config file, if still there are entries in the resource config set
 	//so check if length > 0, abort and throw an error
 	if len(resourceConfigSet) > 0 {
-		log.Error("The resource_configuration in the config file has invalid component names")
-		return fmt.Errorf("The resource_configuration in the config file has invalid component names")
+		var invalidKeys []string
+		for k,_ := range resourceConfigSet {
+			invalidKeys = append(invalidKeys, k)
+		}
+		log.Error("The resource_configuration in the config file has invalid component names %v ", invalidKeys)
+		return fmt.Errorf("The resource_configuration in the config file has invalid component names %v ", invalidKeys)
 	}
 
 	for configKey, configValue := range resourceConfiguration {
