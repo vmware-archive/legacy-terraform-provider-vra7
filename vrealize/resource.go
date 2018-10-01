@@ -303,8 +303,8 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		for k,_ := range resourceConfigSet {
 			invalidKeys = append(invalidKeys, k)
 		}
-		log.Error("The resource_configuration in the config file has invalid component names %v ", invalidKeys)
-		return fmt.Errorf("The resource_configuration in the config file has invalid component names %v ", invalidKeys)
+		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
+		return fmt.Errorf("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
 	}
 
 	for configKey, configValue := range resourceConfiguration {
