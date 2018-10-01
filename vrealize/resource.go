@@ -278,6 +278,31 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Update request template field values with values from user configuration.
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+
+	//check if the resource configuration is valid in the terraform config file
+	//creates a set of resource configuration keys with only component names
+	//for instance, for the key, machine.cpu, insert machine in the set
+	//for machine.vSphere.cpu, insert machine.vSphere
+	resourceConfigSet := make(map[string]bool)
+	for k := range resourceConfiguration {
+		lastIndex := strings.LastIndex(k, ".")
+		key := k[0:lastIndex]
+		resourceConfigSet[key] = true
+	}
+
+	//compare the componentList with the resource config set and if found, delete from the set
+	for _,componentName := range componentNameList {
+		if _, ok := resourceConfigSet[componentName]; ok {
+			delete(resourceConfigSet, componentName)
+		}
+	}
+	//there are invalid resource config keys in the terraform config file, if still there are entries in the resource config set
+	//so check if length > 0, abort and throw an error
+	if len(resourceConfigSet) > 0 {
+		log.Error("The resource_configuration in the config file has invalid component names")
+		return fmt.Errorf("The resource_configuration in the config file has invalid component names")
+	}
+
 	for configKey, configValue := range resourceConfiguration {
 		for _, componentName := range componentNameList {
 			// User-supplied resource configuration keys are expected to be of the form:
