@@ -3,17 +3,18 @@ package vrealize
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/terraform/helper/schema"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"sort"
-	"github.com/vmware/terraform-provider-vra7/utils"
+
+	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/op/go-logging"
+	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
-var(
+var (
 	log = logging.MustGetLogger(utils.LOGGER_ID)
 )
 
@@ -276,8 +277,14 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// component names. In these situations, the longest name match that includes '.'s should win.
 	sort.Sort(byLength(componentNameList))
 
-	//Update request template field values with values from user configuration.
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+
+	validityErr := checkConfigValidity(requestTemplate, resourceConfiguration)
+	if validityErr != nil {
+		return validityErr
+	}
+
+	//Update request template field values with values from user configuration.
 	for configKey, configValue := range resourceConfiguration {
 		for _, componentName := range componentNameList {
 			// User-supplied resource configuration keys are expected to be of the form:
@@ -339,7 +346,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	request_status := ""
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		log.Info("Waiting for %d seconds before checking request status.", sleepFor)
-		time.Sleep(time.Duration(sleepFor)*time.Second)
+		time.Sleep(time.Duration(sleepFor) * time.Second)
 
 		readResource(d, meta)
 
@@ -353,7 +360,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 			//unset resource details from state.
 			d.SetId("")
 			return fmt.Errorf("Resource creation FAILED.")
-		} else if request_status == "IN_PROGRESS"{
+		} else if request_status == "IN_PROGRESS" {
 			log.Info("Resource creation is still IN PROGRESS.")
 		} else {
 			log.Info("Resource creation request status: %s.", request_status)
@@ -370,7 +377,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	return fmt.Errorf("Resource creation has timed out !!")
 }
 
-func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}) {
+func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	var replaced bool
 	templateInterface, replaced = replaceValueInRequestTemplate(templateInterface, field, value)
 
@@ -428,15 +435,26 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	//Get client handle
 	vRAClient := meta.(*APIClient)
 
+	//Get request template for catalog item.
+	requestTemplate, _ := vRAClient.GetCatalogItemRequestTemplate(d.Get("catalog_id").(string))
+	log.Info("createResource->requestTemplate %v\n", requestTemplate)
+
+	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
+
+	validityErr := checkConfigValidity(requestTemplate, resourceConfiguration)
+	if validityErr != nil {
+		return validityErr
+	}
+
 	//If any change made in resource_configuration.
 	if d.HasChange("resource_configuration") {
+
 		//Read resource template
 		GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if errTemplate != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 		}
 
-		resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 		VMReconfigActionUrls := readVMReconfigActionUrls(GetDeploymentStateData)
 
 		//Iterate over the resources in the deployment
@@ -725,8 +743,8 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
 	for i := 0; i < waitTimeout/sleepFor; i++ {
-		time.Sleep(time.Duration(sleepFor)*time.Second)
-		log.Info("Checking to see if resource is deleted.");
+		time.Sleep(time.Duration(sleepFor) * time.Second)
+		log.Info("Checking to see if resource is deleted.")
 		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
@@ -870,4 +888,45 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 	}
 
 	return catalogRequest, nil
+}
+
+// check if the resource configuration is valid in the terraform config file
+func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate, resourceConfiguration map[string]interface{}) error {
+	log.Info("Checking if the terraform config file is valid")
+	// creates a set of resource configuration keys with only component names
+	// for instance, for the key, machine.cpu, insert machine in the set
+	// for machine.vSphere.cpu, insert machine.vSphere
+	resourceConfigSet := make(map[string]bool)
+	for k := range resourceConfiguration {
+		lastIndex := strings.LastIndex(k, ".")
+		key := k[0:lastIndex]
+		resourceConfigSet[key] = true
+	}
+
+	// Get all component names in the blueprint corresponding to the catalog item.
+	var componentNameList []string
+	for field := range requestTemplate.Data {
+		if reflect.ValueOf(requestTemplate.Data[field]).Kind() == reflect.Map {
+			componentNameList = append(componentNameList, field)
+		}
+	}
+	log.Info("checkConfigValidity->key_list %v\n", componentNameList)
+
+	// compare the componentList with the resource config set and if found, delete from the set
+	for _, componentName := range componentNameList {
+		if _, ok := resourceConfigSet[componentName]; ok {
+			delete(resourceConfigSet, componentName)
+		}
+	}
+	// there are invalid resource config keys in the terraform config file, if still there are entries in the resource config set
+	// so check if length > 0, abort and throw an error
+	if len(resourceConfigSet) > 0 {
+		var invalidKeys []string
+		for k, _ := range resourceConfigSet {
+			invalidKeys = append(invalidKeys, k)
+		}
+		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
+		return fmt.Errorf("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
+	}
+	return nil
 }
