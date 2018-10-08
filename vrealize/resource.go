@@ -925,9 +925,7 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
-	// If execution gets timed-out and status is in progress
-	// then dependent machine won't get created in this iteration.
-	// A user needs to ensure that the status should be a success state
-	// using terraform refresh command and hit terraform apply again.
+	// The execution has timed out while still IN PROGRESS.
+	// The user will need to use 'terraform refresh' at a later point to resolve this.
 	return fmt.Errorf("Resource creation has timed out !!")
 }
