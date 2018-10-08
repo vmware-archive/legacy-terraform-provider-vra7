@@ -340,7 +340,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	d.SetId(catalogRequest.ID)
 	//Set request status
 	d.Set(utils.REQUEST_STATUS, "SUBMITTED")
-	return checkRequestStatus(d, meta)
+	return waitForRequestCompletion(d, meta)
 }
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
@@ -480,7 +480,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
-	return checkRequestStatus(d, meta)
+	return waitForRequestCompletion(d, meta)
 }
 
 func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate *ResourceActionTemplate, meta interface{}) error {
@@ -897,7 +897,7 @@ func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate, resourceCo
 }
 
 // check the request status on apply and update
-func checkRequestStatus(d *schema.ResourceData, meta interface{}) error {
+func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 
 	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
@@ -925,12 +925,9 @@ func checkRequestStatus(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
-	//If request is in_progress state during the time then
-	//keep resource details in state files and throw an error
-	//so that the child resource won't go for create call.
-	//If execution gets timed-out and status is in progress
-	//then dependent machine won't get created in this iteration.
-	//A user needs to ensure that the status should be a success state
-	//using terraform refresh command and hit terraform apply again.
+	// If execution gets timed-out and status is in progress
+	// then dependent machine won't get created in this iteration.
+	// A user needs to ensure that the status should be a success state
+	// using terraform refresh command and hit terraform apply again.
 	return fmt.Errorf("Resource creation has timed out !!")
 }
