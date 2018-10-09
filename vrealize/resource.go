@@ -858,38 +858,39 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 // check if the resource configuration is valid in the terraform config file
 func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate, resourceConfiguration map[string]interface{}) error {
 	log.Info("Checking if the terraform config file is valid")
-	// creates a set of resource configuration keys with only component names
-	// for instance, for the key, machine.cpu, insert machine in the set
-	// for machine.vSphere.cpu, insert machine.vSphere
-	resourceConfigSet := make(map[string]bool)
-	for k := range resourceConfiguration {
-		lastIndex := strings.LastIndex(k, ".")
-		key := k[0:lastIndex]
-		resourceConfigSet[key] = true
-	}
 
 	// Get all component names in the blueprint corresponding to the catalog item.
-	var componentNameList []string
+	componentSet := make(map[string]bool)
 	for field := range requestTemplate.Data {
 		if reflect.ValueOf(requestTemplate.Data[field]).Kind() == reflect.Map {
-			componentNameList = append(componentNameList, field)
+			componentSet[field] = true
 		}
 	}
-	log.Info("checkConfigValidity->key_list %v\n", componentNameList)
+	log.Info("The component name(s) in the blueprint corresponding to the catalog item: %v\n", componentSet)
 
-	// compare the componentList with the resource config set and if found, delete from the set
-	for _, componentName := range componentNameList {
-		if _, ok := resourceConfigSet[componentName]; ok {
-			delete(resourceConfigSet, componentName)
+	var invalidKeys []string
+	// check if the keys in the resourceConfiguration map exists in the componentSet
+	// if the key in config is machine1.vsphere.custom.location, match every string after each dot
+	// until a matching string is found in componentSet.
+	// If found, it's a valid key else the component name is invalid
+	for k := range resourceConfiguration {
+		var key = k
+		var isValid bool
+		for strings.LastIndex(key, ".") != -1 {
+			lastIndex := strings.LastIndex(key, ".")
+			key = k[0:lastIndex]
+			if _, ok := componentSet[key]; ok {
+				log.Info("The component name %s in the terraform config file is valid ", key)
+				isValid = true
+				break
+			}
 		}
-	}
-	// there are invalid resource config keys in the terraform config file, if still there are entries in the resource config set
-	// so check if length > 0, abort and throw an error
-	if len(resourceConfigSet) > 0 {
-		var invalidKeys []string
-		for k, _ := range resourceConfigSet {
+		if !isValid {
 			invalidKeys = append(invalidKeys, k)
 		}
+	}
+	// there are invalid resource config keys in the terraform config file, abort and throw an error
+	if len(invalidKeys) > 0 {
 		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
 		return fmt.Errorf("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
 	}
