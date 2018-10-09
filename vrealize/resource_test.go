@@ -3,9 +3,10 @@ package vrealize
 import (
 	"encoding/json"
 	"errors"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"reflect"
 	"testing"
+
+	"gopkg.in/jarcoal/httpmock.v1"
 )
 
 var client APIClient
@@ -271,4 +272,47 @@ func TestChangeValueFunction(t *testing.T) {
 		t.Errorf("Failed to update interface value")
 	}
 
+}
+
+func TestConfigValidityFunction(t *testing.T) {
+
+	mockRequestTemplate := CatalogItemRequestTemplate{}
+	mockRequestTemplate.CatalogItemID = "mock-catalog-item-id"
+	mockRequestTemplate.Description = "mock-description"
+	mockRequestTemplate.Type = "mock-type"
+	requestTemplateData := make(map[string]interface{})
+	requestTemplateDataValueMap := make(map[string]interface{})
+	requestTemplateData["key1"] = "value1"
+	requestTemplateData["key2"] = 10
+	requestTemplateData["machine1"] = requestTemplateDataValueMap
+	requestTemplateData["_no_of_lease"] = 2
+
+	mockRequestTemplate.Data = requestTemplateData
+
+	mockConfigResourceMap := make(map[string]interface{})
+	mockConfigResourceMap["machine1.cpu"] = 2
+	mockConfigResourceMap["machine1.storage"] = 8
+
+	err := checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	if err != nil {
+		t.Errorf("The terraform config is valid. failed to validate. Expecting no error, but found %v ", err.Error())
+	}
+
+	requestTemplateData["mock.machine2"] = requestTemplateDataValueMap
+	mockConfigResourceMap["mock.machine2.mock.cpu"] = 2
+
+	err = checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	if err != nil {
+		t.Errorf("The terraform config is valid. failed to validate. Expecting no error, but found %v ", err.Error())
+	}
+
+	mockConfigResourceMap["mock.machine3.vSphere.mock.cpu"] = 2
+
+	var mockInvalidKeys []string
+	mockInvalidKeys = append(mockInvalidKeys, "mock.machine3.vSphere.mock.cpu")
+
+	err = checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	if err == nil {
+		t.Errorf("The terraform config is invalid. failed to validate")
+	}
 }

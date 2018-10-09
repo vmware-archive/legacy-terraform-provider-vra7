@@ -878,7 +878,7 @@ func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate, resourceCo
 		var isValid bool
 		for strings.LastIndex(key, ".") != -1 {
 			lastIndex := strings.LastIndex(key, ".")
-			key = k[0:lastIndex]
+			key = key[0:lastIndex]
 			if _, ok := componentSet[key]; ok {
 				log.Info("The component name %s in the terraform config file is valid ", key)
 				isValid = true
@@ -892,7 +892,7 @@ func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate, resourceCo
 	// there are invalid resource config keys in the terraform config file, abort and throw an error
 	if len(invalidKeys) > 0 {
 		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
-		return fmt.Errorf("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
+		return fmt.Errorf(utils.CONFIG_INVALID_ERROR, strings.Join(invalidKeys, ", "))
 	}
 	return nil
 }
