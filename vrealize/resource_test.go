@@ -3,9 +3,12 @@ package vrealize
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/vmware/terraform-provider-vra7/utils"
 	"gopkg.in/jarcoal/httpmock.v1"
 )
 
@@ -311,8 +314,14 @@ func TestConfigValidityFunction(t *testing.T) {
 	var mockInvalidKeys []string
 	mockInvalidKeys = append(mockInvalidKeys, "mock.machine3.vSphere.mock.cpu")
 
+	validityErr := fmt.Sprintf(utils.CONFIG_INVALID_ERROR, strings.Join(mockInvalidKeys, ", "))
 	err = checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
 	if err == nil {
-		t.Errorf("The terraform config is invalid. failed to validate")
+		t.Errorf("The terraform config is invalid. failed to validate. Expected the error %v. but found no error", validityErr)
 	}
+
+	if err.Error() != validityErr {
+		t.Errorf("Expected: %v, but Found: %v", validityErr, err.Error())
+	}
+
 }
