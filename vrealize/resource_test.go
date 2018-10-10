@@ -310,6 +310,8 @@ func TestConfigValidityFunction(t *testing.T) {
 
 	validityErr := fmt.Sprintf(utils.CONFIG_INVALID_ERROR, strings.Join(mockInvalidKeys, ", "))
 	err = checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
+	// this should throw an error as none of the string combinations (mock, mock.machine3, mock.machine3.vsphere, etc)
+	// matches the component names(mock.test.machine1 and machine2) in the request template
 	if err == nil {
 		t.Errorf("The terraform config is invalid. failed to validate. Expected the error %v. but found no error", validityErr)
 	}
@@ -322,7 +324,10 @@ func TestConfigValidityFunction(t *testing.T) {
 // creates a mock request template from a request template template json file
 func GetMockRequestTemplate() *CatalogItemRequestTemplate {
 
-	filePath := ".." + utils.GetPathSeparator() + "resources" + utils.GetPathSeparator() + "MockRequestTemplate"
+	ps := utils.GetPathSeparator()
+	filePath := os.Getenv("GOPATH") + ps + "src" + ps + "github.com" + ps +
+		"vmware" + ps + "terraform-provider-vra7" + ps + "resources" + ps + "MockRequestTemplate"
+
 	absPath, _ := filepath.Abs(filePath)
 
 	jsonFile, err := os.Open(absPath)
