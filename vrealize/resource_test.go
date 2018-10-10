@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -279,34 +282,25 @@ func TestChangeValueFunction(t *testing.T) {
 
 func TestConfigValidityFunction(t *testing.T) {
 
-	mockRequestTemplate := CatalogItemRequestTemplate{}
-	mockRequestTemplate.CatalogItemID = "mock-catalog-item-id"
-	mockRequestTemplate.Description = "mock-description"
-	mockRequestTemplate.Type = "mock-type"
-	requestTemplateData := make(map[string]interface{})
-	requestTemplateDataValueMap := make(map[string]interface{})
-	requestTemplateData["key1"] = "value1"
-	requestTemplateData["key2"] = 10
-	requestTemplateData["machine1"] = requestTemplateDataValueMap
-	requestTemplateData["_no_of_lease"] = 2
+	mockRequestTemplate := GetMockRequestTemplate()
 
-	mockRequestTemplate.Data = requestTemplateData
-
+	// a resource_configuration map is created with valid components
+	// all combinations of components name and properties are created with dots
 	mockConfigResourceMap := make(map[string]interface{})
-	mockConfigResourceMap["machine1.cpu"] = 2
-	mockConfigResourceMap["machine1.storage"] = 8
+	mockConfigResourceMap["mock.test.machine1.cpu"] = 2
+	mockConfigResourceMap["mock.test.machine1.mock.storage"] = 8
 
-	err := checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	err := checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
 	if err != nil {
-		t.Errorf("The terraform config is valid. failed to validate. Expecting no error, but found %v ", err.Error())
+		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
 	}
 
-	requestTemplateData["mock.machine2"] = requestTemplateDataValueMap
-	mockConfigResourceMap["mock.machine2.mock.cpu"] = 2
+	mockConfigResourceMap["machine2.mock.cpu"] = 2
+	mockConfigResourceMap["machine2.storage"] = 2
 
-	err = checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	err = checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
 	if err != nil {
-		t.Errorf("The terraform config is valid. failed to validate. Expecting no error, but found %v ", err.Error())
+		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
 	}
 
 	mockConfigResourceMap["mock.machine3.vSphere.mock.cpu"] = 2
@@ -315,7 +309,7 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockInvalidKeys = append(mockInvalidKeys, "mock.machine3.vSphere.mock.cpu")
 
 	validityErr := fmt.Sprintf(utils.CONFIG_INVALID_ERROR, strings.Join(mockInvalidKeys, ", "))
-	err = checkConfigValidity(&mockRequestTemplate, mockConfigResourceMap)
+	err = checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
 	if err == nil {
 		t.Errorf("The terraform config is invalid. failed to validate. Expected the error %v. but found no error", validityErr)
 	}
@@ -323,5 +317,26 @@ func TestConfigValidityFunction(t *testing.T) {
 	if err.Error() != validityErr {
 		t.Errorf("Expected: %v, but Found: %v", validityErr, err.Error())
 	}
+}
+
+// creates a mock request template from a request template template json file
+func GetMockRequestTemplate() *CatalogItemRequestTemplate {
+
+	filePath := ".." + utils.GetPathSeparator() + "resources" + utils.GetPathSeparator() + "MockRequestTemplate"
+	absPath, _ := filepath.Abs(filePath)
+
+	jsonFile, err := os.Open(absPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	mockRequestTemplate := CatalogItemRequestTemplate{}
+	json.Unmarshal(byteValue, &mockRequestTemplate)
+
+	return &mockRequestTemplate
 
 }
