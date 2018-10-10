@@ -3,9 +3,16 @@ package vrealize
 import (
 	"encoding/json"
 	"errors"
-	"gopkg.in/jarcoal/httpmock.v1"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/vmware/terraform-provider-vra7/utils"
+	"gopkg.in/jarcoal/httpmock.v1"
 )
 
 var client APIClient
@@ -270,5 +277,71 @@ func TestChangeValueFunction(t *testing.T) {
 	if eq2 {
 		t.Errorf("Failed to update interface value")
 	}
+
+}
+
+func TestConfigValidityFunction(t *testing.T) {
+
+	mockRequestTemplate := GetMockRequestTemplate()
+
+	// a resource_configuration map is created with valid components
+	// all combinations of components name and properties are created with dots
+	mockConfigResourceMap := make(map[string]interface{})
+	mockConfigResourceMap["mock.test.machine1.cpu"] = 2
+	mockConfigResourceMap["mock.test.machine1.mock.storage"] = 8
+
+	err := checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
+	if err != nil {
+		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
+	}
+
+	mockConfigResourceMap["machine2.mock.cpu"] = 2
+	mockConfigResourceMap["machine2.storage"] = 2
+
+	err = checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
+	if err != nil {
+		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
+	}
+
+	mockConfigResourceMap["mock.machine3.vSphere.mock.cpu"] = 2
+
+	var mockInvalidKeys []string
+	mockInvalidKeys = append(mockInvalidKeys, "mock.machine3.vSphere.mock.cpu")
+
+	validityErr := fmt.Sprintf(utils.CONFIG_INVALID_ERROR, strings.Join(mockInvalidKeys, ", "))
+	err = checkConfigValidity(mockRequestTemplate, mockConfigResourceMap)
+	// this should throw an error as none of the string combinations (mock, mock.machine3, mock.machine3.vsphere, etc)
+	// matches the component names(mock.test.machine1 and machine2) in the request template
+	if err == nil {
+		t.Errorf("The terraform config is invalid. failed to validate. Expected the error %v. but found no error", validityErr)
+	}
+
+	if err.Error() != validityErr {
+		t.Errorf("Expected: %v, but Found: %v", validityErr, err.Error())
+	}
+}
+
+// creates a mock request template from a request template template json file
+func GetMockRequestTemplate() *CatalogItemRequestTemplate {
+
+	ps := utils.GetPathSeparator()
+	filePath := os.Getenv("GOPATH") + ps + "src" + ps + "github.com" + ps +
+		"vmware" + ps + "terraform-provider-vra7" + ps + "resources" + ps + "MockRequestTemplate"
+
+	absPath, _ := filepath.Abs(filePath)
+
+	jsonFile, err := os.Open(absPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	mockRequestTemplate := CatalogItemRequestTemplate{}
+	json.Unmarshal(byteValue, &mockRequestTemplate)
+
+	return &mockRequestTemplate
 
 }
