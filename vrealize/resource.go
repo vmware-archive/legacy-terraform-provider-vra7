@@ -274,8 +274,8 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	log.Info("createResource->requestTemplate.Data %v\n", requestTemplate.Data)
 
-	business_group_id := d.Get("businessgroup_id").(string)
-	business_group_name := d.Get("businessgroup_name").(string)
+	business_group_id := strings.TrimSpace(d.Get("businessgroup_id").(string))
+	business_group_name := strings.TrimSpace(d.Get("businessgroup_name").(string))
 
 	// get the business group id from name
 	var businessGroupIdFromName string
@@ -969,26 +969,19 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 // Retrieve business group id from business group name
 func (vRAClient *APIClient) GetBusinessGroupId(businessGroupName string) (string, error) {
 
-	path := "identity/api/tenants/" + vRAClient.Tenant + "/subtenants"
+	path := "/identity/api/tenants/" + vRAClient.Tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
 	log.Info("Fetching business group id from name..GET %s ", path)
 	BusinessGroups := new(BusinessGroups)
 	apiError := new(APIError)
-	//Set a REST call to fetch resource view data
 	_, err := vRAClient.HTTPClient.New().Get(path).Receive(BusinessGroups, apiError)
-	fmt.Print(BusinessGroups)
 	if err != nil {
 		return "", err
 	}
 	if !apiError.isEmpty() {
 		return "", apiError
 	}
-
-	for _, businessGroup := range BusinessGroups.Content {
-		if businessGroup.Name == businessGroupName {
-			log.Info("Found the business group id of the group %s: %s ", businessGroupName, businessGroup.Id)
-			return businessGroup.Id, nil
-		}
-	}
-	log.Errorf("No business group found with name: %s ", businessGroupName)
-	return "", errors.New(fmt.Sprintf("No business group found with name: %s ", businessGroupName))
+	// BusinessGroups array will contain only one BusinessGroup element containing the BG
+	// with the name businessGroupName.
+	// Fetch the id of that BG
+	return BusinessGroups.Content[0].Id, nil
 }
