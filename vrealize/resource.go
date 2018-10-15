@@ -2,6 +2,7 @@ package vrealize
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -44,6 +45,15 @@ type RequestStatusView struct {
 		CompletionDetails      string `json:"CompletionDetails"`
 	} `json:"requestCompletion"`
 	Phase string `json:"phase"`
+}
+
+type BusinessGroups struct {
+	Content []BusinessGroup `json:"content,omitempty"`
+}
+
+type BusinessGroup struct {
+	Name string `json:"name,omitempty"`
+	Id   string `json:"id,omitempty"`
 }
 
 //CatalogRequest - A structure that captures a vRA catalog request.
@@ -123,6 +133,11 @@ func setResourceSchema() map[string]*schema.Schema {
 			Optional: true,
 		},
 		"businessgroup_id": {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		"businessgroup_name": {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
@@ -259,8 +274,28 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	log.Info("createResource->requestTemplate.Data %v\n", requestTemplate.Data)
 
-	if len(d.Get("businessgroup_id").(string)) > 0 {
-		requestTemplate.BusinessGroupID = d.Get("businessgroup_id").(string)
+	business_group_id := strings.TrimSpace(d.Get("businessgroup_id").(string))
+	business_group_name := strings.TrimSpace(d.Get("businessgroup_name").(string))
+
+	// get the business group id from name
+	var businessGroupIdFromName string
+	if len(business_group_name) > 0 {
+		businessGroupIdFromName, err = vRAClient.GetBusinessGroupId(business_group_name)
+		if err != nil || businessGroupIdFromName == "" {
+			return err
+		}
+	}
+
+	//if both business group name and id are provided but does not belong to the same business group, throw an error
+	if len(business_group_name) > 0 && len(business_group_id) > 0 && businessGroupIdFromName != business_group_id {
+		log.Error("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", business_group_name, business_group_id)
+		return errors.New(fmt.Sprintf("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", business_group_name, business_group_id))
+	} else if len(business_group_id) > 0 { // else if both are provided and matches or just id is provided, use id
+		log.Info("Setting business group id %s ", business_group_id)
+		requestTemplate.BusinessGroupID = business_group_id
+	} else if len(business_group_name) > 0 { // else if name is provided, use the id fetched from the name
+		log.Info("Setting business group id %s for the group %s ", businessGroupIdFromName, business_group_name)
+		requestTemplate.BusinessGroupID = businessGroupIdFromName
 	}
 
 	// Get all component names in the blueprint corresponding to the catalog item.
@@ -929,4 +964,24 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 	// The execution has timed out while still IN PROGRESS.
 	// The user will need to use 'terraform refresh' at a later point to resolve this.
 	return fmt.Errorf("Resource creation has timed out !!")
+}
+
+// Retrieve business group id from business group name
+func (vRAClient *APIClient) GetBusinessGroupId(businessGroupName string) (string, error) {
+
+	path := "/identity/api/tenants/" + vRAClient.Tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
+	log.Info("Fetching business group id from name..GET %s ", path)
+	BusinessGroups := new(BusinessGroups)
+	apiError := new(APIError)
+	_, err := vRAClient.HTTPClient.New().Get(path).Receive(BusinessGroups, apiError)
+	if err != nil {
+		return "", err
+	}
+	if !apiError.isEmpty() {
+		return "", apiError
+	}
+	// BusinessGroups array will contain only one BusinessGroup element containing the BG
+	// with the name businessGroupName.
+	// Fetch the id of that BG
+	return BusinessGroups.Content[0].Id, nil
 }
