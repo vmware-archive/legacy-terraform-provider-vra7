@@ -175,6 +175,7 @@ func setResourceSchema() map[string]*schema.Schema {
 				Type:     schema.TypeMap,
 				Optional: true,
 				Elem:     schema.TypeString,
+				Computed: true,
 			},
 		},
 		"catalog_configuration": {
@@ -321,12 +322,17 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	//Update request template field values with values from user configuration.
 	for configKey, configValue := range resourceConfiguration {
+		if len(configValue.(string)) == 0 {
+			break
+		}
 		for _, componentName := range componentNameList {
 			// User-supplied resource configuration keys are expected to be of the form:
 			//     <component name>.<property name>.
 			// Extract the property names and values for each component in the blueprint, and add/update
 			// them in the right location in the request template.
 			if strings.HasPrefix(configKey, componentName) {
+				//If user_configuration contains resource_list element
+				// then split user configuration key into resource_name and field_name
 				propertyName := strings.TrimPrefix(configKey, componentName+".")
 				if len(propertyName) == 0 {
 					return fmt.Errorf(
@@ -341,6 +347,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 				break
 			}
 		}
+
 	}
 
 	//update template with deployment level config
@@ -480,7 +487,10 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 				}
 				configChanged := false
 				returnFlag := false
-				for configKey := range resourceConfiguration {
+				for configKey, configValue := range resourceConfiguration {
+					if configValue == "" {
+						continue
+					}
 					//compare resource list (resource_name) with user configuration fields
 					if strings.HasPrefix(configKey, componentName+".") {
 						//If user_configuration contains resource_list element
@@ -541,6 +551,39 @@ func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourc
 	return nil
 }
 
+func updateTFResourceConfigurationMap(returnValue interface{}, resourceConfiguration map[string]interface{},
+	configKey string, d *schema.ResourceData) map[string]interface{} {
+	//If value returned from getTemplateValue is in float64 format then
+	//convert it in string format
+	if reflect.ValueOf(returnValue).Kind() == reflect.Float64 {
+		strValue := strconv.FormatFloat(returnValue.(float64), 'f', 2, 64)
+		resourceConfiguration[configKey] = strValue
+	} else {
+		//If value type is string then set it as it is
+		resourceConfiguration[configKey] = returnValue
+	}
+	return resourceConfiguration
+}
+
+func getTemplateValue(templateInterface map[string]interface{}, field string) interface{} {
+	//Iterate over the map to get field provided as an argument
+	for i := range templateInterface {
+		//If value type is map then set recursive call which will fiend field in one level down of map interface
+		if reflect.ValueOf(templateInterface[i]).Kind() == reflect.Map {
+			template, _ := templateInterface[i].(map[string]interface{})
+			returnValue := getTemplateValue(template, field)
+			if returnValue != nil {
+				return returnValue
+			}
+		} else if i == field {
+			//If value type is not map then compare field name with provided field name
+			//If both matches then update field value with provided value
+			return templateInterface[i]
+		}
+	}
+	return nil
+}
+
 // Terraform call - terraform refresh
 // This function retrieves the latest state of a vRA 7 deployment. Terraform updates its state based on
 // the information returned by this function.
@@ -573,6 +616,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 	var childConfig map[string]interface{}
 	childConfig = map[string]interface{}{}
+	componentData := map[string]interface{}{}
 
 	for _, value := range GetDeploymentStateData.Content {
 		resourceMap := value.(map[string]interface{})
@@ -587,6 +631,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 				return err
 			}
 			childConfig[componentName] = resourceActionTemplate.Data
+			componentData[componentName] = resourceMap
 
 			// get IP address
 			if ipAddress, ok := resourceSpecificData["ip_address"]; ok {
@@ -594,19 +639,16 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
-
 	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	changed := false
 
-	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig)
-
+	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, childConfig, componentData)
 	if changed {
 		setError := d.Set("resource_configuration", resourceConfiguration)
 		if setError != nil {
 			return fmt.Errorf(setError.Error())
 		}
 	}
-
 	return nil
 }
 
@@ -638,18 +680,23 @@ func getResourceConfigTemplate(reconfigGetLink string, d *schema.ResourceData, m
 // resourceConfiguration : updated resource_configuration map[string]interface data
 // changed : boolean for data got changed or not
 func updateResourceConfigurationMap(
-	resourceConfiguration map[string]interface{}, vmData map[string]interface{}) (map[string]interface{}, bool) {
+	resourceConfiguration map[string]interface{}, vmData map[string]interface{}, componentData map[string]interface{}) (map[string]interface{}, bool) {
 	var changed bool
 	for configKey1, configValue1 := range resourceConfiguration {
 		for configKey2, configValue2 := range vmData {
 			if strings.HasPrefix(configKey1, configKey2+".") {
 				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
 				currentValue := configValue1
-				updatedValue := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
-
-				if updatedValue != nil && updatedValue != currentValue {
-					resourceConfiguration[configKey1] = updatedValue
+				updatedValue1 := getTemplateFieldValue(configValue2.(map[string]interface{}), trimmedKey)
+				updatedValue2 := getTemplateFieldValue(componentData[configKey2].(map[string]interface{}), trimmedKey)
+				if updatedValue1 != nil && updatedValue1 != currentValue {
+					resourceConfiguration[configKey1] = updatedValue1
 					changed = true
+					break
+				}else if updatedValue2 != nil && updatedValue2 != currentValue {
+					resourceConfiguration[configKey1] = updatedValue2
+					changed = true
+					break
 				}
 			}
 		}
@@ -838,6 +885,7 @@ func (vRAClient *APIClient) GetRequestStatus(ResourceID string) (*RequestStatusV
 	if !apiError.isEmpty() {
 		return nil, apiError
 	}
+
 	return RequestStatusViewTemplate, nil
 }
 

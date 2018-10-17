@@ -1,0 +1,123 @@
+id: multiMachineBlueprint
+name: multiMachineBlueprint
+description: This blueprint contains win-IIS and Centos machine
+status: PUBLISHED
+components:
+  CentOs:
+    type: Infrastructure.CatalogItem.Machine.Virtual.vSphere
+    data:
+      _cluster:
+        default: 1
+        max: 1
+        min: 1
+      action:
+        fixed: Create
+      allow_storage_policies:
+        fixed: false
+      blueprint_type:
+        fixed: '1'
+      cpu:
+        default: 1
+        max: 1
+        min: 1
+      disks:
+      - capacity: 3
+        id: 1524208428819
+        initial_location: ''
+        is_clone: false
+        label: ''
+        storage_reservation_policy: ''
+        userCreated: true
+        volumeId: 0
+      max_network_adapters: {}
+      max_volumes: {}
+      memory:
+        default: 4096
+        max: 4096
+        min: 4096
+      nics:
+      - address: ''
+        assignment_type: Static
+        id: 0
+        load_balancing: ''
+        network: ${_resource~corp192168110024}
+        network_profile: corp-192.168.110.0/24
+      provisioning_workflow:
+        fixed:
+          id: BasicVmWorkflow
+          label: BasicVmWorkflow
+      security_groups: []
+      security_tags: []
+      storage:
+        default: 3
+        max: 3
+        min: 3
+  IIS:
+    type: Software.IIS
+    data:
+      InetPubLog: c:\Inetpub\Log
+      InetPubRoot: c:\Inetpub
+      InetPubWWWRoot: c:\Inetpub\WWWRoot
+      host:
+        fixed: ${_resource~Win}
+  Win:
+    type: Infrastructure.CatalogItem.Machine.Virtual.vSphere
+    data:
+      _cluster:
+        default: 1
+        max: 1
+        min: 1
+      action:
+        fixed: Create
+      allow_storage_policies:
+        fixed: false
+      blueprint_type:
+        fixed: '1'
+      cpu:
+        default: 1
+        max: 1
+        min: 1
+      disks:
+      - capacity: 3
+        id: 1524208401246
+        initial_location: ''
+        is_clone: false
+        label: ''
+        storage_reservation_policy: ''
+        userCreated: true
+        volumeId: 0
+      max_network_adapters: {}
+      max_volumes: {}
+      memory:
+        default: 4096
+        max: 4096
+        min: 4096
+      nics:
+      - address: ''
+        assignment_type: Static
+        id: 0
+        load_balancing: ''
+        network: ${_resource~corp192168110024}
+        network_profile: corp-192.168.110.0/24
+      provisioning_workflow:
+        fixed:
+          id: BasicVmWorkflow
+          label: BasicVmWorkflow
+      security_groups: []
+      security_tags: []
+      storage:
+        default: 3
+        max: 3
+        min: 3
+  corp192168110024:
+    type: Infrastructure.Network.Network.Existing
+    data:
+      name:
+        fixed: corp192168110024
+      network_profile:
+        fixed: corp-192.168.110.0/24
+layout:
+  CentOs: 1,1
+  IIS: 0,0
+  Win: 1,0
+  corp192168110024: 0,0
