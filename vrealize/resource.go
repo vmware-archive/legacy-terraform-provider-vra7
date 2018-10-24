@@ -79,7 +79,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get(utils.CATALOG_ID).(string))
 	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", catalogItemID, requestTemplate.Data)
 
-	validityErr := checkConfigValidity(vRAClient, d, requestTemplate)
+	validityErr := checkConfigValidity(requestTemplate)
+	if validityErr != nil {
+		return validityErr
+	}
+	validityErr = checkConfigValuesValidity(vRAClient, d, requestTemplate)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -184,7 +188,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get(utils.CATALOG_ID).(string))
 	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", catalogItemID, requestTemplate.Data)
 
-	validityErr := checkConfigValidity(vRAClient, d, requestTemplate)
+	validityErr := checkConfigValidity(requestTemplate)
+	if validityErr != nil {
+		return validityErr
+	}
+	validityErr = checkConfigValuesValidity(vRAClient, d, requestTemplate)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -639,13 +647,54 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 }
 
 // check if the resource configuration is valid in the terraform config file
-func checkConfigValidity(vRAClient *APIClient, d *schema.ResourceData, requestTemplate *CatalogItemRequestTemplate) error {
+func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate) error {
 	log.Info("Checking if the terraform config file is valid")
 	// If catalog_name and catalog_id both not provided then return an error
 	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
 		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
 	}
 
+	// Get all component names in the blueprint corresponding to the catalog item.
+	componentSet := make(map[string]bool)
+	for field := range requestTemplate.Data {
+		if reflect.ValueOf(requestTemplate.Data[field]).Kind() == reflect.Map {
+			componentSet[field] = true
+		}
+	}
+	log.Info("The component name(s) in the blueprint corresponding to the catalog item: %v\n", componentSet)
+
+	var invalidKeys []string
+	// check if the keys in the resourceConfiguration map exists in the componentSet
+	// if the key in config is machine1.vsphere.custom.location, match every string after each dot
+	// until a matching string is found in componentSet.
+	// If found, it's a valid key else the component name is invalid
+	for k := range resourceConfiguration {
+		var key = k
+		var isValid bool
+		for strings.LastIndex(key, ".") != -1 {
+			lastIndex := strings.LastIndex(key, ".")
+			key = key[0:lastIndex]
+			if _, ok := componentSet[key]; ok {
+				log.Info("The component name %s in the terraform config file is valid ", key)
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			invalidKeys = append(invalidKeys, k)
+		}
+	}
+	// there are invalid resource config keys in the terraform config file, abort and throw an error
+	if len(invalidKeys) > 0 {
+		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
+		return fmt.Errorf(utils.CONFIG_INVALID_ERROR, strings.Join(invalidKeys, ", "))
+	}
+	return nil
+}
+
+// check if the values provided in the config file are valid and set
+// them in the resource schema. Requires to call APIs
+func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData, requestTemplate *CatalogItemRequestTemplate) error {
 	// If catalog item name is provided then get catalog item ID using name for further process
 	// else if catalog item id is provided then fetch catalog name
 	if len(catalogItemName) > 0 {
@@ -691,42 +740,6 @@ func checkConfigValidity(vRAClient *APIClient, d *schema.ResourceData, requestTe
 	} else if len(businessGroupName) > 0 { // else if name is provided, use the id fetched from the name
 		log.Info("Setting business group id %s for the group %s ", businessGroupIdFromName, businessGroupName)
 		requestTemplate.BusinessGroupID = businessGroupIdFromName
-	}
-
-	// Get all component names in the blueprint corresponding to the catalog item.
-	componentSet := make(map[string]bool)
-	for field := range requestTemplate.Data {
-		if reflect.ValueOf(requestTemplate.Data[field]).Kind() == reflect.Map {
-			componentSet[field] = true
-		}
-	}
-	log.Info("The component name(s) in the blueprint corresponding to the catalog item: %v\n", componentSet)
-
-	var invalidKeys []string
-	// check if the keys in the resourceConfiguration map exists in the componentSet
-	// if the key in config is machine1.vsphere.custom.location, match every string after each dot
-	// until a matching string is found in componentSet.
-	// If found, it's a valid key else the component name is invalid
-	for k := range resourceConfiguration {
-		var key = k
-		var isValid bool
-		for strings.LastIndex(key, ".") != -1 {
-			lastIndex := strings.LastIndex(key, ".")
-			key = key[0:lastIndex]
-			if _, ok := componentSet[key]; ok {
-				log.Info("The component name %s in the terraform config file is valid ", key)
-				isValid = true
-				break
-			}
-		}
-		if !isValid {
-			invalidKeys = append(invalidKeys, k)
-		}
-	}
-	// there are invalid resource config keys in the terraform config file, abort and throw an error
-	if len(invalidKeys) > 0 {
-		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
-		return fmt.Errorf(utils.CONFIG_INVALID_ERROR, strings.Join(invalidKeys, ", "))
 	}
 	return nil
 }
