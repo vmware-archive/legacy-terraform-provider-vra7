@@ -3,8 +3,9 @@ package vrealize
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"testing"
+
+	"gopkg.in/jarcoal/httpmock.v1"
 )
 
 //var client APIClient
