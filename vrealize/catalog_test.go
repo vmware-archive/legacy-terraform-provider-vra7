@@ -3,8 +3,9 @@ package vrealize
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/jarcoal/httpmock.v1"
 	"testing"
+
+	"gopkg.in/jarcoal/httpmock.v1"
 )
 
 func init() {
@@ -76,7 +77,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Error while fetching catalog Item %v", err)
 	}
 
-	if catalogItemID == nil || catalogItemID == "" {
+	if catalogItemID == "" {
 		t.Errorf("Catalog ID is nil")
 	}
 
@@ -85,7 +86,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	// This should return an error
 	catalogItemID, err = client.readCatalogItemIDByName("Cent OS 6.3")
 
-	if catalogItemID != nil && catalogItemID != "" {
+	if catalogItemID != "" {
 		t.Errorf("Catalog Item ID is not nil")
 	}
 
@@ -98,7 +99,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	// This should return empty catalogItemID with suggestions with full name
 	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
-	if catalogItemID != nil && catalogItemID != "" {
+	if catalogItemID != "" {
 		t.Errorf("Catalog Item ID is not nil")
 	}
 
@@ -115,7 +116,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 	// This should return empty catalogItemID with suggestions with full name
 	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 
-	if catalogItemID != nil {
+	if catalogItemID != "" {
 		t.Errorf("Catalog Item ID is not nil")
 	}
 
@@ -130,7 +131,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Data fetched with wrong catalog ID")
 	}
 
-	if catalogItemID != nil {
+	if catalogItemID != "" {
 		t.Errorf("Wrong catalog data got fetched")
 	}
 	httpmock.Reset()
@@ -147,7 +148,7 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		t.Errorf("Data fetched with wrong catalog item ID")
 	}
 
-	if catalogItemID != nil {
+	if catalogItemID != "" {
 		t.Errorf("Wrong catalog item data got fetched")
 	}
 
@@ -157,7 +158,6 @@ func TestFetchCatalogItemByName(t *testing.T) {
 		httpmock.NewStringResponder(500, entitledCatalogItemViewsErrorResp))
 	catalogItemID, err = client.readCatalogItemIDByName("CentOS")
 }
-
 
 // This unit test function contains test cases related to catalog ID in tf config files
 // Scenarios :
@@ -175,7 +175,7 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Error while fetching catalog item %v", err)
 	}
 
-	if catalogItemName == nil {
+	if catalogItemName == "" {
 		t.Errorf("Catalog Item Name is is nil")
 	}
 
@@ -188,7 +188,7 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Data fetched with wrong catalog ID")
 	}
 
-	if catalogItemName != nil {
+	if catalogItemName != "" {
 		t.Errorf("Wrong catalog item data got fetched")
 	}
 
@@ -200,7 +200,7 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Data fetched with wrong catalog ID")
 	}
 
-	if catalogItemName != nil {
+	if catalogItemName != "" {
 		t.Errorf("Wrong catalog data got fetched")
 	}
 }

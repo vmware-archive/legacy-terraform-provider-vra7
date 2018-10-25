@@ -301,7 +301,7 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockResourceData := schema.TestResourceDataRaw(t, resourceSchema, resourceDataMap)
 
 	readProviderConfiguration(mockResourceData)
-	err := checkConfigValidity(mockRequestTemplate)
+	err := checkResourceConfigValidity(mockRequestTemplate)
 	if err != nil {
 		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
 	}
@@ -317,7 +317,7 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockResourceData = schema.TestResourceDataRaw(t, resourceSchema, resourceDataMap)
 	readProviderConfiguration(mockResourceData)
 
-	err = checkConfigValidity(mockRequestTemplate)
+	err = checkResourceConfigValidity(mockRequestTemplate)
 	if err != nil {
 		t.Errorf("The terraform config is valid, failed to validate. Expecting no error, but found %v ", err.Error())
 	}
@@ -335,7 +335,7 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockInvalidKeys = append(mockInvalidKeys, "mock.machine3.vSphere.mock.cpu")
 
 	validityErr := fmt.Sprintf(utils.CONFIG_INVALID_ERROR, strings.Join(mockInvalidKeys, ", "))
-	err = checkConfigValidity(mockRequestTemplate)
+	err = checkResourceConfigValidity(mockRequestTemplate)
 	// this should throw an error as none of the string combinations (mock, mock.machine3, mock.machine3.vsphere, etc)
 	// matches the component names(mock.test.machine1 and machine2) in the request template
 	if err == nil {

@@ -75,15 +75,12 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	// Get client handle
 	vRAClient := meta.(*APIClient)
 	readProviderConfiguration(d)
-	//Get request template for catalog item.
-	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get(utils.CATALOG_ID).(string))
-	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", catalogItemID, requestTemplate.Data)
 
-	validityErr := checkConfigValidity(requestTemplate)
+	requestTemplate, validityErr := checkConfigValuesValidity(vRAClient, d)
 	if validityErr != nil {
 		return validityErr
 	}
-	validityErr = checkConfigValuesValidity(vRAClient, d, requestTemplate)
+	validityErr = checkResourceConfigValidity(requestTemplate)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -146,10 +143,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 	log.Info("Updated template - %v\n", requestTemplate.Data)
 
-	if err != nil {
-		return fmt.Errorf("Invalid CatalogItem ID %v", err)
-	}
-
 	//Fire off a catalog item request to create a deployment.
 	catalogRequest, err := vRAClient.RequestCatalogItem(requestTemplate)
 
@@ -184,15 +177,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	vRAClient := meta.(*APIClient)
 	readProviderConfiguration(d)
 
-	//Get request template for catalog item.
-	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(d.Get(utils.CATALOG_ID).(string))
-	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", catalogItemID, requestTemplate.Data)
-
-	validityErr := checkConfigValidity(requestTemplate)
+	requestTemplate, validityErr := checkConfigValuesValidity(vRAClient, d)
 	if validityErr != nil {
 		return validityErr
 	}
-	validityErr = checkConfigValuesValidity(vRAClient, d, requestTemplate)
+	validityErr = checkResourceConfigValidity(requestTemplate)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -201,7 +190,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	apiError := new(APIError)
 
 	path := fmt.Sprintf(utils.GET_RESOURCE_API, catalogItemRequestID)
-	_, err = vRAClient.HTTPClient.New().Get(path).
+	_, err := vRAClient.HTTPClient.New().Get(path).
 		Receive(ResourceActions, apiError)
 
 	if err != nil {
@@ -209,8 +198,8 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
 	if apiError != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Error())
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Errors)
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Errors)
 	}
 
 	// If any change made in resource_configuration.
@@ -647,12 +636,8 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 }
 
 // check if the resource configuration is valid in the terraform config file
-func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate) error {
+func checkResourceConfigValidity(requestTemplate *CatalogItemRequestTemplate) error {
 	log.Info("Checking if the terraform config file is valid")
-	// If catalog_name and catalog_id both not provided then return an error
-	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
-		return fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
-	}
 
 	// Get all component names in the blueprint corresponding to the catalog item.
 	componentSet := make(map[string]bool)
@@ -694,28 +679,54 @@ func checkConfigValidity(requestTemplate *CatalogItemRequestTemplate) error {
 
 // check if the values provided in the config file are valid and set
 // them in the resource schema. Requires to call APIs
-func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData, requestTemplate *CatalogItemRequestTemplate) error {
-	// If catalog item name is provided then get catalog item ID using name for further process
-	// else if catalog item id is provided then fetch catalog name
-	if len(catalogItemName) > 0 {
-		catalogItemID, returnErr := vRAClient.readCatalogItemIDByName(catalogItemName)
-		log.Info("The catalog item id provided in the config is %v\n", catalogItemID)
-		if returnErr != nil {
-			return fmt.Errorf("%v", returnErr)
-		}
-		if catalogItemID == nil && catalogItemID == "" {
-			return fmt.Errorf("No catalog item found with name %v", catalogItemID)
-		}
-		d.Set(utils.CATALOG_ID, catalogItemID.(string))
-	} else if len(catalogItemID) > 0 {
-		CatalogItemName, nameError := vRAClient.readCatalogItemNameByID(catalogItemName)
-		if nameError != nil {
-			return fmt.Errorf("%v", nameError)
-		}
-		if nameError != nil {
-			d.Set(utils.CATALOG_NAME, CatalogItemName.(string))
-		}
+func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*CatalogItemRequestTemplate, error) {
+	// 	// If catalog_name and catalog_id both not provided then return an error
+	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
+		return nil, fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
 	}
+
+	var catalogItemIdFromName string
+	var catalogItemNameFromId string
+	var err error
+	// if catalog item id is provided, fetch the catalog item name
+	if len(catalogItemName) > 0 {
+		catalogItemIdFromName, err = vRAClient.readCatalogItemIDByName(catalogItemName)
+		if err != nil || catalogItemIdFromName == "" {
+			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", catalogItemName, err)
+		}
+		log.Info("The catalog item id provided in the config is %v\n", catalogItemIdFromName)
+	}
+
+	// if catalog item name is provided, fetch the catalog item id
+	if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
+		catalogItemNameFromId, err = vRAClient.readCatalogItemNameByID(catalogItemID)
+		if err != nil || catalogItemNameFromId == "" {
+			return nil, fmt.Errorf("Error in finding catalog item name corresponding to the catlog item id %v: \n %v", catalogItemID, err)
+		}
+		log.Info("The catalog item name corresponding to the catalog item id in the config is:  %v\n", catalogItemNameFromId)
+	}
+
+	// if both catalog item name and id are provided but does not belong to the same catalog item, throw an error
+	if len(catalogItemName) > 0 && len(catalogItemID) > 0 && (catalogItemIdFromName != catalogItemID || catalogItemNameFromId != catalogItemName) {
+		log.Error("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
+		return nil, errors.New("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
+	} else if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
+		d.Set(utils.CATALOG_ID, catalogItemID)
+		d.Set(utils.CATALOG_NAME, catalogItemNameFromId)
+	} else if len(catalogItemName) > 0 { // else if name is provided, use the id fetched from the name
+		d.Set(utils.CATALOG_ID, catalogItemIdFromName)
+		d.Set(utils.CATALOG_NAME, catalogItemName)
+	}
+
+	// update the catalogItemID var with the updated id
+	catalogItemID = d.Get(utils.CATALOG_ID).(string)
+
+	// Get request template for catalog item.
+	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(catalogItemID)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", catalogItemID, requestTemplate.Data)
 
 	for field1 := range catalogConfiguration {
 		requestTemplate.Data[field1] = catalogConfiguration[field1]
@@ -726,14 +737,14 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData, req
 	if len(businessGroupName) > 0 {
 		businessGroupIdFromName, err := vRAClient.GetBusinessGroupId(businessGroupName)
 		if err != nil || businessGroupIdFromName == "" {
-			return err
+			return nil, err
 		}
 	}
 
 	//if both business group name and id are provided but does not belong to the same business group, throw an error
 	if len(businessGroupName) > 0 && len(businessGroupId) > 0 && businessGroupIdFromName != businessGroupId {
 		log.Error("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupId)
-		return errors.New(fmt.Sprintf("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupId))
+		return nil, errors.New(fmt.Sprintf("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupId))
 	} else if len(businessGroupId) > 0 { // else if both are provided and matches or just id is provided, use id
 		log.Info("Setting business group id %s ", businessGroupId)
 		requestTemplate.BusinessGroupID = businessGroupId
@@ -741,7 +752,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData, req
 		log.Info("Setting business group id %s for the group %s ", businessGroupIdFromName, businessGroupName)
 		requestTemplate.BusinessGroupID = businessGroupIdFromName
 	}
-	return nil
+	return requestTemplate, nil
 }
 
 // check the request status on apply and update
