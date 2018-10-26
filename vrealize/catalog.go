@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-
 //CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
 type CatalogItemRequestTemplate struct {
 	Type            string                 `json:"type"`
@@ -66,7 +65,7 @@ type Metadata struct {
 }
 
 // readCatalogItemNameByID - This function returns the catalog item name using catalog item ID
-func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (interface{}, error) {
+func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (string, error) {
 	//Form a path to read catalog template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s", catalogItemID)
@@ -77,18 +76,18 @@ func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (interface{}, 
 	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if !apiError.isEmpty() {
-		return nil, apiError
+		return "", apiError
 	}
 	//Return catalog Name
 	return template.CatalogItem.Name, nil
 }
 
 //readCatalogItemIdByName - To read id of catalog from vRA using catalog_name
-func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, error) {
+func (c *APIClient) readCatalogItemIDByName(catalogName string) (string, error) {
 	var catalogItemID string
 
 	log.Info("readCatalogItemIdByName->catalog_name %v\n", catalogName)
@@ -102,11 +101,11 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, er
 	_, preErr := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if preErr != nil {
-		return nil, preErr
+		return "", preErr
 	}
 
 	if !apiError.isEmpty() {
-		return nil, apiError
+		return "", apiError
 	}
 
 	//Fetch all catalogs from vRA
@@ -115,11 +114,11 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, er
 	resp, errResp := c.HTTPClient.New().Get(path).Receive(template, apiError)
 
 	if !apiError.isEmpty() {
-		return nil, apiError
+		return "", apiError
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, errResp
+		return "", errResp
 	}
 
 	var catalogItemNameArray []string
@@ -134,7 +133,7 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, er
 			//If exact name matches then return respective catalog_id
 			//else if provided catalog matches as a substring in name then store it in array
 			if catalogName == catalogItem["name"].(string) {
-				return catalogItem["catalogItemId"].(interface{}), nil
+				return catalogItem["catalogItemId"].(string), nil
 			} else if catalogName == catalogItem["name"].(string)[0:catalogItemNameLen] {
 				catalogItemNameArray = append(catalogItemNameArray, catalogItem["name"].(string))
 			}
@@ -153,12 +152,12 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (interface{}, er
 		if len(catalogItemNameArray) > 1 {
 			punctuation = "are"
 		}
-		return nil, fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
+		return "", fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
 			"Please select from above.", punctuation, len(catalogItemNameArray), errorMessage)
 	}
 
 	if !apiError.isEmpty() {
-		return nil, apiError
+		return "", apiError
 	}
 	return catalogItemID, nil
 }
