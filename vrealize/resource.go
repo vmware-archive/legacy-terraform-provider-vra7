@@ -197,7 +197,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, err.Error())
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
-	if apiError != nil {
+	if apiError != nil && !apiError.isEmpty() {
 		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Errors)
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Errors)
 	}
@@ -225,11 +225,17 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 					for _, entry := range entries {
 						if entry.Key == utils.COMPONENT {
 							entryValue := entry.Value
-							componentName := entryValue.Value.(string)
+							var componentName string
+							for k, v := range entryValue {
+								if k == "value" {
+									componentName = v.(string)
+								}
+							}
 							resourceActionTemplate := new(ResourceActionTemplate)
 							apiError := new(APIError)
 							log.Info("Retrieving reconfigure action template for the component: %v ", componentName)
 							getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, resources.Id, reconfigureActionId)
+							log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
 							response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
 								Receive(resourceActionTemplate, apiError)
 							response.Close = true
@@ -335,6 +341,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	for _, resource := range requestResourceView.Content {
 		if resource.ResourceType == utils.INFRASTRUCTURE_VIRTUAL {
 			resourceData := resource.ResourcesData
+			log.Info("The resource data map of the resource %v is: \n%v", resourceData.Component, resource.ResourcesData)
 			dataVals := make(map[string]interface{})
 			resourceDataMap[resourceData.Component] = dataVals
 			dataVals[utils.MACHINE_CPU] = resourceData.Cpu

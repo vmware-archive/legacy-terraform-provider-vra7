@@ -98,7 +98,7 @@ type DeploymentResourceData struct {
 // Retrieves the resources that were provisioned as a result of a given request.
 // Also returns the actions allowed on the resources and their templates
 type ResourceActions struct {
-	Links   []string                `json:"links,omitempty"`
+	Links   []interface{}           `json:"links,omitempty"`
 	Content []ResourceActionContent `json:"content,omitempty"`
 }
 
@@ -121,8 +121,8 @@ type ResourceTypeRef struct {
 type Operation struct {
 	Name        string `json:"name,omitempty"`
 	OperationId string `json:"id,omitempty"`
+	Description string `json:"description,omitempty"`
 	Type        string `json:"type,omitempty"`
-	BindingId   string `json:"bindingId,omitempty"`
 }
 
 type ResourceDataMap struct {
@@ -130,11 +130,7 @@ type ResourceDataMap struct {
 }
 type ResourceDataEntry struct {
 	Key   string                 `json:"key,omitempty"`
-	Value ResourceDataEntryValue `json:"value,omitempty"`
-}
-type ResourceDataEntryValue struct {
-	Type  string      `json:"type,omitempty"`
-	Value interface{} `json:"value,omitempty"`
+	Value map[string]interface{} `json:"value,omitempty"`
 }
 
 //CatalogRequest - A structure that captures a vRA catalog request.
