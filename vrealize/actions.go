@@ -24,11 +24,14 @@ type byLength []string
 
 //GetActionTemplate - set call for read template/blueprint
 func (c *APIClient) GetActionTemplate(resourceViewsTemplate *ResourceView, actionURLString string) (*ActionTemplate, *ResourceView, error) {
+	log.Info("Getting action template corresponding to the action URL %v \n", actionURLString)
 	//Fetch an action URL from given template
 	actionURL := getactionURL(resourceViewsTemplate, actionURLString)
+	log.Info("The action url is %v ", actionURL)
 
 	//Raise an error if action URL not found
 	if len(actionURL) == 0 {
+		log.Errorf("The action url is empty")
 		return nil, resourceViewsTemplate, fmt.Errorf("resource is not created or not found")
 	}
 
@@ -45,6 +48,8 @@ func (c *APIClient) GetActionTemplate(resourceViewsTemplate *ResourceView, actio
 	if !apiError.isEmpty() {
 		return nil, resourceViewsTemplate, apiError
 	}
+
+	log.Info("The action template fetched is %v ", actionTemplate)
 
 	return actionTemplate, resourceViewsTemplate, nil
 }

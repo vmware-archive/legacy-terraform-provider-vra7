@@ -427,6 +427,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Resource not found")
 	}
 
+	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
 	ResourceActions := new(ResourceActions)
 	apiError := new(APIError)
 
@@ -445,6 +446,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//If resource create status is in_progress then skip delete call and through an exception
 	if d.Get(utils.REQUEST_STATUS).(string) != "SUCCESSFUL" {
 		if d.Get(utils.REQUEST_STATUS).(string) == "FAILED" {
+			log.Info("The status of the request is FAILED, setting the id to null")
 			d.SetId("")
 			return nil
 		}
@@ -463,6 +465,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	DestroyMachineTemplate, resourceTemplate, errDestroyAction := vRAClient.GetDestroyActionTemplate(GetDeploymentStateData)
 	if errDestroyAction != nil {
 		if errDestroyAction.Error() == "resource is not created or not found" {
+			log.Errorf("The destroy action template cannot be retrieved with error, resource is not created or not found")
 			d.SetId("")
 			return fmt.Errorf("possibly resource got deleted outside terraform")
 		}
