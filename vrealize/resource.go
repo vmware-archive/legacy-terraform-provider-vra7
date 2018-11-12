@@ -426,58 +426,71 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	if len(d.Id()) == 0 {
 		return fmt.Errorf("Resource not found")
 	}
-
 	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
+
+	// If resource create status is in_progress then skip delete call and through an exception
+	//Note: vRA API should return error on destroy action if the request is in progress. Filed a bug
+	if d.Get(utils.REQUEST_STATUS).(string) == "IN_PROGRESS" {
+		return fmt.Errorf("Machine cannot be deleted while in-progress state. Please try again later. \n Terraform refresh to get the latest state of your request")
+	}
+
 	ResourceActions := new(ResourceActions)
 	apiError := new(APIError)
 
-	_, err := vRAClient.HTTPClient.New().Get("/catalog-service/api/consumer/resources/"+d.Id()+"/actions").
+	path := fmt.Sprintf(utils.GET_RESOURCE_API, catalogItemRequestID)
+	_, err := vRAClient.HTTPClient.New().Get(path).
 		Receive(ResourceActions, apiError)
 
 	if err != nil {
-		log.Errorf("error while reading resource actions for the request %v ", d.Id())
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, err.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
-	if apiError != nil {
-		log.Errorf("API error while reading resource actions for the request %v ", d.Id())
+	if apiError != nil && !apiError.isEmpty() {
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Errors)
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Errors)
 	}
 
-	log.Info("the resource action struct is %v", ResourceActions)
+	for _, resources := range ResourceActions.Content {
+		if resources.ResourceTypeRef.Id == utils.DEPLOYMENT_RESOURCE_TYPE {
+			deploymentName := resources.Name
+			var destroyEnabled bool
+			var destroyActionID string
+			for _, op := range resources.Operations {
+				if op.Name == utils.DESTROY {
+					destroyEnabled = true
+					destroyActionID = op.OperationId
+					break
+				}
+			}
+			// if destroy deployment action is not available for the deployment
+			// return with an error message
+			if !destroyEnabled {
+				return fmt.Errorf("The deployment %v cannot be destroyed, your entitlement has no Destroy Deployment action enabled", deploymentName)
+			} else {
+				resourceActionTemplate := new(ResourceActionTemplate)
+				apiError := new(APIError)
+				log.Info("Retrieving destroy action template for the deployment: %v ", resources.Id)
+				getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
+				log.Info("Call GET to fetch the destroy action template %v ", getActionTemplatePath)
+				response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
+					Receive(resourceActionTemplate, apiError)
+				response.Close = true
+				if !apiError.isEmpty() {
+					log.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, apiError.Error())
+					return fmt.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, apiError.Error())
+				}
+				if err != nil {
+					log.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, err.Error())
+					return fmt.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, err.Error())
+				}
 
-	//If resource create status is in_progress then skip delete call and through an exception
-	if d.Get(utils.REQUEST_STATUS).(string) != "SUCCESSFUL" {
-		if d.Get(utils.REQUEST_STATUS).(string) == "FAILED" {
-			log.Info("The status of the request is FAILED, setting the id to null")
-			d.SetId("")
-			return nil
+				postActionTemplatePath := fmt.Sprintf(utils.POST_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
+				err = vRAClient.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
+				if err != nil {
+					return err
+				}
+			}
 		}
-		return fmt.Errorf("Machine cannot be deleted while in-progress state. Please try later")
-
-	}
-	//Fetch machine template
-	GetDeploymentStateData, errTemplate := vRAClient.GetDeploymentState(catalogItemRequestID)
-
-	if errTemplate != nil {
-		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
-	}
-
-	//Set a delete machine template function call.
-	//Which will fetch and return the delete machine template from the given template
-	DestroyMachineTemplate, resourceTemplate, errDestroyAction := vRAClient.GetDestroyActionTemplate(GetDeploymentStateData)
-	if errDestroyAction != nil {
-		if errDestroyAction.Error() == "resource is not created or not found" {
-			log.Errorf("The destroy action template cannot be retrieved with error, resource is not created or not found")
-			d.SetId("")
-			return fmt.Errorf("possibly resource got deleted outside terraform")
-		}
-
-		return fmt.Errorf("Destory Machine action template failed to load: %v", errDestroyAction)
-	}
-
-	//Set a destroy machine REST call
-	_, errDestroyMachine := vRAClient.DestroyMachine(DestroyMachineTemplate, resourceTemplate)
-	//Raise an exception if error got while deleting resource
-	if errDestroyMachine != nil {
-		return fmt.Errorf("Destory Machine machine operation failed: %v", errDestroyMachine)
 	}
 
 	waitTimeout := d.Get(utils.WAIT_TIME_OUT).(int) * 60
@@ -497,37 +510,27 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	if d.Id() != "" {
 		d.SetId("")
-		return fmt.Errorf("resource still being deleted after %v minutes", d.Get(utils.WAIT_TIME_OUT))
+		return fmt.Errorf("Resource still being deleted after %v minutes", d.Get(utils.WAIT_TIME_OUT))
 	}
 	return nil
 }
 
 //DestroyMachine - To set resource destroy call
-func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
-	//Get a destroy template URL from given resource template
-	var destroyactionURL string
-	destroyactionURL = getactionURL(resourceViewTemplate, "POST: {com.vmware.csp.component.cafe.composition@resource.action.deployment.destroy.name}")
-	//Raise an error if any exception raised while fetching delete resource URL
-	if len(destroyactionURL) == 0 {
-		return nil, fmt.Errorf("Resource is not created or not found")
-	}
-
-	actionResponse := new(ActionResponseTemplate)
+func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ResourceActionTemplate, destroyActionURL string) error {
 	apiError := new(APIError)
-
-	//Set a REST call with delete resource request and delete resource template as a data
-	resp, err := vRAClient.HTTPClient.New().Post(destroyactionURL).
-		BodyJSON(destroyTemplate).Receive(actionResponse, apiError)
+	resp, err := vRAClient.HTTPClient.New().Post(destroyActionURL).
+		BodyJSON(destroyTemplate).Receive(nil, apiError)
 
 	if resp.StatusCode != 201 {
-		return nil, err
+		log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
+		return err
 	}
 
 	if !apiError.isEmpty() {
-		return nil, apiError
+		log.Errorf("The destroy deployment request failed with error: %v ", apiError.Errors)
+		return apiError
 	}
-
-	return actionResponse, nil
+	return nil
 }
 
 //PowerOffMachine - To set resource power-off call
@@ -629,7 +632,7 @@ func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemReque
 		return nil, jErr
 	}
 
-	log.Info("JSON Request Info: %s", jsonBody)
+	log.Info("JSON Request Info: %s", string(jsonBody))
 	//Set a REST call to create a machine
 	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(requestTemplate).
 		Receive(catalogRequest, apiError)
@@ -783,6 +786,7 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 			log.Info("Resource creation SUCCESSFUL.")
 			return nil
 		} else if request_status == "FAILED" {
+			log.Error("Request Failed with message %v ", d.Get(utils.FAILED_MESSAGE))
 			//If request is failed during the time then
 			//unset resource details from state.
 			d.SetId("")

@@ -12,8 +12,10 @@ const (
 	CATALOG_CONFIGURATION    = "catalog_configuration"
 	REQUEST_STATUS           = "request_status"
 	INFRASTRUCTURE_VIRTUAL   = "Infrastructure.Virtual"
+	DEPLOYMENT_RESOURCE_TYPE = "composition.resource.type.deployment"
 	COMPONENT                = "Component"
 	RECONFIGURE              = "Reconfigure"
+	DESTROY                  = "Destroy"
 
 	// read resource machine constants
 	MACHINE_CPU              = "cpu"
