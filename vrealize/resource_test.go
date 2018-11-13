@@ -234,7 +234,6 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 
 	resourceActionTemplate := new(ResourceActionTemplate)
 	apiError := new(APIError)
-	//getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, "ea68a707-bd35-4765-a1fc-16aca56ff844", "356d45a1-d30e-4def-86c9-10cb9aa2b0de")
 	getActionTemplatePath := "http://localhost/catalog-service/api/consumer/resources/ea68a707-bd35-4765-a1fc-16aca56ff844/actions/356d45a1-d30e-4def-86c9-10cb9aa2b0de/requests/template"
 	response, err := client.HTTPClient.New().Get(getActionTemplatePath).
 		Receive(resourceActionTemplate, apiError)
@@ -242,12 +241,10 @@ func TestAPIClient_destroyMachine(t *testing.T) {
 	response.Close = true
 
 	if err != nil {
-		log.Errorf("errer %v ", err.Error())
 		t.Errorf("Expected no error but found %v ", err.Error())
 	}
 
 	if apiError != nil && !apiError.isEmpty() {
-		log.Errorf("errer %v ", apiError.Error())
 		t.Errorf("Expected no error but found %v ", apiError.Error())
 	}
 
