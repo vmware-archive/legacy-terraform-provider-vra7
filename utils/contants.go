@@ -39,9 +39,13 @@ const (
 	WINDOWS_PATH_SEPARATOR = "\\"
 	UNIX_PATH_SEPARATOR    = "/"
 	WINDOWS_OS             = "windows"
+	IN_PROGRESS            = "IN_PROGRESS"
+	SUCCESSFUL             = "SUCCESSFUL"
+	FAILED                 = "FAILED"
 
-	//error constants
-	CONFIG_INVALID_ERROR = "The resource_configuration in the config file has invalid component name(s): %v "
+	// error constants
+	CONFIG_INVALID_ERROR          = "The resource_configuration in the config file has invalid component name(s): %v "
+	DESTROY_ACTION_TEMPLATE_ERROR = "Error retrieving destroy action template for the deployment %v: %v "
 
 	// api constants
 	CATALOG_SERVICE               = "/catalog-service"

@@ -327,7 +327,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	// Update resource request status in state file
 	d.Set(utils.REQUEST_STATUS, resourceTemplate.Phase)
 	// If request is failed then set failed message in state file
-	if resourceTemplate.Phase == "FAILED" {
+	if resourceTemplate.Phase == utils.FAILED {
 		log.Errorf(resourceTemplate.RequestCompletion.CompletionDetails)
 		d.Set(utils.FAILED_MESSAGE, resourceTemplate.RequestCompletion.CompletionDetails)
 	}
@@ -422,17 +422,11 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//Get client handle
 	vRAClient := meta.(*APIClient)
 
-	//Through an error if request ID has no value or empty value
+	// Throw an error if request ID has no value or empty value
 	if len(d.Id()) == 0 {
 		return fmt.Errorf("Resource not found")
 	}
 	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
-
-	// If resource create status is in_progress then skip delete call and through an exception
-	//Note: vRA API should return error on destroy action if the request is in progress. Filed a bug
-	if d.Get(utils.REQUEST_STATUS).(string) == "IN_PROGRESS" {
-		return fmt.Errorf("Machine cannot be deleted while in-progress state. Please try again later. \n Terraform refresh to get the latest state of your request")
-	}
 
 	ResourceActions := new(ResourceActions)
 	apiError := new(APIError)
@@ -469,19 +463,18 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			} else {
 				resourceActionTemplate := new(ResourceActionTemplate)
 				apiError := new(APIError)
-				log.Info("Retrieving destroy action template for the deployment: %v ", resources.Id)
 				getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
-				log.Info("Call GET to fetch the destroy action template %v ", getActionTemplatePath)
+				log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.Id)
 				response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
 					Receive(resourceActionTemplate, apiError)
 				response.Close = true
 				if !apiError.isEmpty() {
-					log.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, apiError.Error())
-					return fmt.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, apiError.Error())
+					log.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, apiError.Error())
+					return fmt.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, apiError.Error())
 				}
 				if err != nil {
-					log.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, err.Error())
-					return fmt.Errorf("Error retrieving destroy action template for the deployment %v: %v ", deploymentName, err.Error())
+					log.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, err.Error())
+					return fmt.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, err.Error())
 				}
 
 				postActionTemplatePath := fmt.Sprintf(utils.POST_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
@@ -502,6 +495,12 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
 		}
+		// If resource create status is in_progress then skip delete call and throw an exception
+		// Note: vRA API should return error on destroy action if the request is in progress. Filed a bug
+		if d.Get(utils.REQUEST_STATUS).(string) == utils.IN_PROGRESS {
+			return fmt.Errorf("Machine cannot be deleted while request is in-progress state. Please try again later. \nRun terraform refresh to get the latest state of your request")
+		}
+
 		if len(deploymentStateData.Content) == 0 {
 			//If resource got deleted then unset the resource ID from state file
 			d.SetId("")
@@ -782,16 +781,16 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 
 		request_status = d.Get(utils.REQUEST_STATUS).(string)
 		log.Info("Checking to see if resource is created. Status: %s.", request_status)
-		if request_status == "SUCCESSFUL" {
+		if request_status == utils.SUCCESSFUL {
 			log.Info("Resource creation SUCCESSFUL.")
 			return nil
-		} else if request_status == "FAILED" {
+		} else if request_status == utils.FAILED {
 			log.Error("Request Failed with message %v ", d.Get(utils.FAILED_MESSAGE))
 			//If request is failed during the time then
 			//unset resource details from state.
 			d.SetId("")
 			return fmt.Errorf("Request failed \n %v ", d.Get(utils.FAILED_MESSAGE))
-		} else if request_status == "IN_PROGRESS" {
+		} else if request_status == utils.IN_PROGRESS {
 			log.Info("Resource creation is still IN PROGRESS.")
 		} else {
 			log.Info("Resource creation request status: %s.", request_status)
