@@ -10,11 +10,11 @@ import (
 //ResourceActionTemplate - is used to store information
 //related to resource action template information.
 type ResourceActionTemplate struct {
-	Type        string                 `json:"type"`
-	ResourceID  string                 `json:"resourceId"`
-	ActionID    string                 `json:"actionId"`
-	Description string                 `json:"description"`
-	Data        map[string]interface{} `json:"data"`
+	Type        string                 `json:"type,omitempty"`
+	ResourceID  string                 `json:"resourceId,omitempty"`
+	ActionID    string                 `json:"actionId,omitempty"`
+	Description string                 `json:"description,omitempty"`
+	Data        map[string]interface{} `json:"data,omitempty"`
 }
 
 //ResourceView - is used to store information
