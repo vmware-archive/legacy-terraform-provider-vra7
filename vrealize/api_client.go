@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
 	"github.com/dghubble/sling"
 )
-
 
 //APIClient - This struct is used to store information provided in .tf file under provider block
 //Later on, this stores bearToken after successful authentication and uses that token for next
