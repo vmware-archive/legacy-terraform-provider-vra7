@@ -2,12 +2,13 @@ package utils
 
 import (
 	"os"
+
 	"github.com/op/go-logging"
 )
 
 var (
 	terraformVraProviderFileName = "vra-terraform.log"
-	format                   = logging.MustStringFormatter(
+	format                       = logging.MustStringFormatter(
 		`%{color}%{time:2006-01-02T15:04:05.999Z07:00} %{shortfile} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 	)
 )
@@ -20,7 +21,7 @@ func initTerraformVraProviderLog() {
 	//Setup terraform service log
 	var backendList = []logging.Backend{}
 	var logFile *os.File
-	logFile, err := os.OpenFile("." + GetPathSeparator() + terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile("."+GetPathSeparator()+terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		f, err2 := os.OpenFile(terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err2 != nil {

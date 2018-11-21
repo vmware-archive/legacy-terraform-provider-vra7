@@ -13,8 +13,8 @@ build:
 	done
 
 check:
-	@test -z $(shell gofmt -l ${SRC} | tee /dev/stderr) || echo "Fix formatting issues with 'make fmt'"
 	@gofmt -d ${SRC}
+	@test -z "$(shell gofmt -l ${SRC} | tee /dev/stderr)" || { echo "Fix formatting issues with 'make fmt'"; exit 1; }
 	@for d in $$(go list ./... | grep -v /vendor/); do golint $${d}; done
 	@go tool vet main.go
 	@go tool vet vrealize
