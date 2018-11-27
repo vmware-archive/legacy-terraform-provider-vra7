@@ -144,13 +144,13 @@ var resourceViewsResp = `{"links":[],"content":[{"@type":"CatalogResourceView","
 "href":"https://vra-01a.corp.local/catalog-service/api/consumer/resourceViews/588f5e28-5572-495e-b104-e1237eaf2b98"}]}],
 "metadata":{"size":20,"totalElements":3,"totalPages":1,"number":1,"offset":0}}`
 
-var catalogItemId = "666d77e3-7642-492d-aad1-82b8edd30e56"
+var mockCatalogItemID = "666d77e3-7642-492d-aad1-82b8edd30e56"
 
 func TestPowerOffAction(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/requests/"+catalogItemId+"/resourceViews",
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/requests/"+mockCatalogItemID+"/resourceViews",
 		httpmock.NewStringResponder(200, resourceViewsResp))
 
 	httpmock.RegisterResponder("GET", "https://vra-01a.corp.local/catalog-service/api/consumer/resources/4f58732f-62c7-4d38-a78b-b2cf34ee45df/actions/b37c071e-06ce-4842-b194-0f64a829908f/requests/template",
@@ -158,7 +158,7 @@ func TestPowerOffAction(t *testing.T) {
 			"resourceId":"4f58732f-62c7-4d38-a78b-b2cf34ee45df","actionId":"b37c071e-06ce-4842-b194-0f64a829908f","description":null,
 			"data":{}}`))
 
-	templateResources, errTemplate := client.GetDeploymentState(catalogItemId)
+	templateResources, errTemplate := client.GetDeploymentState(mockCatalogItemID)
 	if errTemplate != nil {
 		t.Errorf("Failed to get the template resources %v", errTemplate)
 	}

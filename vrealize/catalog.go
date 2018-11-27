@@ -28,11 +28,11 @@ type CatalogItem struct {
 }
 
 //GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
-func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemId string) (*CatalogItemRequestTemplate, error) {
+func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTemplate, error) {
 	//Form a path to read catalog request template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s/requests/template",
-		catalogItemId)
+		catalogItemID)
 
 	log.Info("GetCatalogItemRequestTemplate->path %v\n", path)
 

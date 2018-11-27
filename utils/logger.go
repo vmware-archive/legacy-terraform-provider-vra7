@@ -13,6 +13,7 @@ var (
 	)
 )
 
+// InitLog - initializes the log
 func InitLog() {
 	initTerraformVraProviderLog()
 }
