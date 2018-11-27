@@ -1,8 +1,7 @@
 package utils
 
+// terraform provider constants
 const (
-	// terraform provider constants
-
 	CatalogName             = "catalog_name"
 	CatalogID               = "catalog_id"
 	BusinessGroupID         = "businessgroup_id"

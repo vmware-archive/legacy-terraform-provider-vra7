@@ -2,7 +2,6 @@ package vrealize
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -698,8 +697,8 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 
 	// if both catalog item name and id are provided but does not belong to the same catalog item, throw an error
 	if len(catalogItemName) > 0 && len(catalogItemID) > 0 && (catalogItemIDFromName != catalogItemID || catalogItemNameFromID != catalogItemName) {
-		log.Error("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
-		return nil, errors.New("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
+		log.Error("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.", catalogItemName, catalogItemID)
+		return nil, fmt.Errorf("The catalog item name %s and id %s does not belong to the same catalog item ,provide either name or id", catalogItemName, catalogItemID)
 	} else if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
 		d.Set(utils.CatalogID, catalogItemID)
 		d.Set(utils.CatalogName, catalogItemNameFromID)
@@ -734,7 +733,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 	//if both business group name and id are provided but does not belong to the same business group, throw an error
 	if len(businessGroupName) > 0 && len(businessGroupID) > 0 && businessGroupIDFromName != businessGroupID {
 		log.Error("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupID)
-		return nil, fmt.Errorf("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupID)
+		return nil, fmt.Errorf("The business group name %s and id %s does not belong to the same business group, povide either name or id", businessGroupName, businessGroupID)
 	} else if len(businessGroupID) > 0 { // else if both are provided and matches or just id is provided, use id
 		log.Info("Setting business group id %s ", businessGroupID)
 		requestTemplate.BusinessGroupID = businessGroupID
@@ -777,7 +776,7 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 
 	// The execution has timed out while still IN PROGRESS.
 	// The user will need to use 'terraform refresh' at a later point to resolve this.
-	return fmt.Errorf("Resource creation has timed out !!")
+	return fmt.Errorf("Resource creation has timed out")
 }
 
 // GetBusinessGroupID retrieves business group id from business group name
