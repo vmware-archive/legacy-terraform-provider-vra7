@@ -29,6 +29,19 @@ var (
 	catalogConfiguration    map[string]interface{}
 )
 
+// byLength type to sort component name list by it's name length
+type byLength []string
+
+func (s byLength) Less(i, j int) bool {
+	return len(s[i]) < len(s[j])
+}
+func (s byLength) Len() int {
+	return len(s)
+}
+func (s byLength) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 //Replace the value for a given key in a catalog request template.
 func replaceValueInRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
 	var replaced bool
@@ -528,39 +541,6 @@ func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ResourceActionTempla
 		return apiError
 	}
 	return nil
-}
-
-//PowerOffMachine - To set resource power-off call
-func (vRAClient *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
-	//Get power-off resource URL from given template
-	var powerOffMachineactionURL string
-	powerOffMachineactionURL = getactionURL(resourceViewTemplate, "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.PowerOff}")
-	//Raise an exception if error got while fetching URL
-	if len(powerOffMachineactionURL) == 0 {
-		return nil, fmt.Errorf("resource is not created or not found")
-	}
-
-	actionResponse := new(ActionResponseTemplate)
-	apiError := new(APIError)
-
-	//Set a rest call to power-off the resource with resource power-off template as a data
-	response, err := vRAClient.HTTPClient.New().Post(powerOffMachineactionURL).
-		BodyJSON(powerOffTemplate).Receive(actionResponse, apiError)
-
-	response.Close = true
-	if response.StatusCode == 201 {
-		return actionResponse, nil
-	}
-
-	if !apiError.isEmpty() {
-		return nil, apiError
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, err
 }
 
 //GetRequestStatus - To read request status of resource
