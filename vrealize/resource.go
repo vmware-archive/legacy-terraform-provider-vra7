@@ -697,8 +697,8 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 
 	// if both catalog item name and id are provided but does not belong to the same catalog item, throw an error
 	if len(catalogItemName) > 0 && len(catalogItemID) > 0 && (catalogItemIDFromName != catalogItemID || catalogItemNameFromID != catalogItemName) {
-		log.Error("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.", catalogItemName, catalogItemID)
-		return nil, fmt.Errorf("The catalog item name %s and id %s does not belong to the same catalog item ,provide either name or id", catalogItemName, catalogItemID)
+		log.Error(utils.CatalogItemIDNameNotMatchingErr, catalogItemName, catalogItemID)
+		return nil, fmt.Errorf(utils.CatalogItemIDNameNotMatchingErr, catalogItemName, catalogItemID)
 	} else if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
 		d.Set(utils.CatalogID, catalogItemID)
 		d.Set(utils.CatalogName, catalogItemNameFromID)
@@ -732,8 +732,8 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 
 	//if both business group name and id are provided but does not belong to the same business group, throw an error
 	if len(businessGroupName) > 0 && len(businessGroupID) > 0 && businessGroupIDFromName != businessGroupID {
-		log.Error("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupID)
-		return nil, fmt.Errorf("The business group name %s and id %s does not belong to the same business group, povide either name or id", businessGroupName, businessGroupID)
+		log.Error(utils.BusinessGroupIDNameNotMatchingErr, businessGroupName, businessGroupID)
+		return nil, fmt.Errorf(utils.BusinessGroupIDNameNotMatchingErr, businessGroupName, businessGroupID)
 	} else if len(businessGroupID) > 0 { // else if both are provided and matches or just id is provided, use id
 		log.Info("Setting business group id %s ", businessGroupID)
 		requestTemplate.BusinessGroupID = businessGroupID

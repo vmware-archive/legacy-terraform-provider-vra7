@@ -49,9 +49,10 @@ const (
 
 	// error constants
 
-	ConfigInvalidError         = "The resource_configuration in the config file has invalid component name(s): %v "
-	DestroyActionTemplateError = "Error retrieving destroy action template for the deployment %v: %v "
-
+	ConfigInvalidError                = "The resource_configuration in the config file has invalid component name(s): %v "
+	DestroyActionTemplateError        = "Error retrieving destroy action template for the deployment %v: %v "
+	BusinessGroupIDNameNotMatchingErr = "The business group name %s and id %s does not belong to the same business group, provide either name or id"
+	CatalogItemIDNameNotMatchingErr   = "The catalog item name %s and id %s does not belong to the same catalog item ,provide either name or id"
 	// api constants
 
 	CatalogService            = "/catalog-service"
