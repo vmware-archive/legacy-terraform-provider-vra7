@@ -20,8 +20,8 @@ func init() {
 	)
 }
 
-var catalogItemId1 = "e5dd4fba-45ed-4943-b1fc-7f96239286be"
-var catalogItemId2 = "e5dd4fba-45ed-4943-b1fc-7f96239286b1"
+var catalogItemID1 = "e5dd4fba-45ed-4943-b1fc-7f96239286be"
+var catalogItemID2 = "e5dd4fba-45ed-4943-b1fc-7f96239286b1"
 
 var entitledCatalogItemViewsResp = `{"links":[{"@type":"link","rel":"next",
 "href":"https://vra-01a.corp.local/catalog-service/api/consumer/entitledCatalogItemViews?page=2&limit=20"}],
@@ -166,10 +166,10 @@ func TestFetchCatalogItemByName(t *testing.T) {
 func TestFetchCatalogItemByID(t *testing.T) {
 	httpmock.Activate()
 	defer httpmock.DeactivateAndReset()
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemID1,
 		httpmock.NewStringResponder(200, catalogItemTemplateResp))
 
-	catalogItemName, err := client.readCatalogItemNameByID(catalogItemId1)
+	catalogItemName, err := client.readCatalogItemNameByID(catalogItemID1)
 
 	if err != nil {
 		t.Errorf("Error while fetching catalog item %v", err)
@@ -179,10 +179,10 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Catalog Item Name is is nil")
 	}
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId1,
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemID1,
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
 
-	catalogItemName, err = client.readCatalogItemNameByID(catalogItemId2)
+	catalogItemName, err = client.readCatalogItemNameByID(catalogItemID2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")
@@ -192,9 +192,9 @@ func TestFetchCatalogItemByID(t *testing.T) {
 		t.Errorf("Wrong catalog item data got fetched")
 	}
 
-	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemId2,
+	httpmock.RegisterResponder("GET", "http://localhost/catalog-service/api/consumer/entitledCatalogItems/"+catalogItemID2,
 		httpmock.NewStringResponder(404, entitledCatalogItemViewsErrorResp))
-	catalogItemName, err = client.readCatalogItemNameByID(catalogItemId2)
+	catalogItemName, err = client.readCatalogItemNameByID(catalogItemID2)
 
 	if err == nil {
 		t.Errorf("Data fetched with wrong catalog ID")

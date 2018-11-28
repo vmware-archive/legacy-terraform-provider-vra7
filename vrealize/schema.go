@@ -7,8 +7,8 @@ import (
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
-//ResourceActionTemplate - is used to store information
-//related to resource action template information.
+// ResourceActionTemplate - is used to store information
+// related to resource action template information.
 type ResourceActionTemplate struct {
 	Type        string                 `json:"type,omitempty"`
 	ResourceID  string                 `json:"resourceId,omitempty"`
@@ -17,16 +17,16 @@ type ResourceActionTemplate struct {
 	Data        map[string]interface{} `json:"data,omitempty"`
 }
 
-//ResourceView - is used to store information
-//related to resource template information.
+// ResourceView - is used to store information
+// related to resource template information.
 type ResourceView struct {
 	Content []interface {
 	} `json:"content"`
 	Links []interface{} `json:"links"`
 }
 
-//RequestStatusView - used to store REST response of
-//request triggered against any resource.
+// RequestStatusView - used to store REST response of
+// request triggered against any resource.
 type RequestStatusView struct {
 	RequestCompletion struct {
 		RequestCompletionState string `json:"requestCompletionState"`
@@ -35,40 +35,44 @@ type RequestStatusView struct {
 	Phase string `json:"phase"`
 }
 
+// BusinessGroups - list of business groups
 type BusinessGroups struct {
 	Content []BusinessGroup `json:"content,omitempty"`
 }
 
+// BusinessGroup - detail view of a business group
 type BusinessGroup struct {
 	Name string `json:"name,omitempty"`
-	Id   string `json:"id,omitempty"`
+	ID   string `json:"id,omitempty"`
 }
 
-// Resource View of a provisioned request
+// RequestResourceView - resource view of a provisioned request
 type RequestResourceView struct {
 	Content []DeploymentResource `json:"content,omitempty"`
 	Links   []interface{}        `json:"links,omitempty"`
 }
 
+// DeploymentResource - deployment level view of the provisionined request
 type DeploymentResource struct {
 	RequestState    string                 `json:"requestState,omitempty"`
 	Description     string                 `json:"description,omitempty"`
 	LastUpdated     string                 `json:"lastUpdated,omitempty"`
-	TenantId        string                 `json:"tenantId,omitempty"`
+	TenantID        string                 `json:"tenantId,omitempty"`
 	Name            string                 `json:"name,omitempty"`
-	BusinessGroupId string                 `json:"businessGroupId,omitempty"`
+	BusinessGroupID string                 `json:"businessGroupId,omitempty"`
 	DateCreated     string                 `json:"dateCreated,omitempty"`
 	Status          string                 `json:"status,omitempty"`
-	RequestId       string                 `json:"requestId,omitempty"`
-	ResourceId      string                 `json:"resourceId,omitempty"`
+	RequestID       string                 `json:"requestId,omitempty"`
+	ResourceID      string                 `json:"resourceId,omitempty"`
 	ResourceType    string                 `json:"resourceType,omitempty"`
 	ResourcesData   DeploymentResourceData `json:"data,omitempty"`
 }
 
+// DeploymentResourceData - view of the resources/machines in a deployment
 type DeploymentResourceData struct {
 	Memory                      int    `json:"MachineMemory,omitempty"`
-	Cpu                         int    `json:"MachineCPU,omitempty"`
-	IpAddress                   string `json:"ip_address,omitempty"`
+	CPU                         int    `json:"MachineCPU,omitempty"`
+	IPAddress                   string `json:"ip_address,omitempty"`
 	Storage                     int    `json:"MachineStorage,omitempty"`
 	MachineInterfaceType        string `json:"MachineInterfaceType,omitempty"`
 	MachineName                 string `json:"MachineName,omitempty"`
@@ -78,7 +82,7 @@ type DeploymentResourceData struct {
 	MachineBlueprintName        string `json:"MachineBlueprintName,omitempty"`
 	MachineReservationName      string `json:"MachineReservationName,omitempty"`
 	MachineType                 string `json:"MachineType,omitempty"`
-	MachineId                   string `json:"machineId,omitempty"`
+	MachineID                   string `json:"machineId,omitempty"`
 	MachineExpirationDate       string `json:"MachineExpirationDate,omitempty"`
 	Component                   string `json:"Component,omitempty"`
 	Expire                      bool   `json:"Expire,omitempty"`
@@ -95,39 +99,45 @@ type DeploymentResourceData struct {
 	CreateSnapshot              bool   `json:"CreateSnapshot,omitempty"`
 }
 
-// Retrieves the resources that were provisioned as a result of a given request.
+// ResourceActions - Retrieves the resources that were provisioned as a result of a given request.
 // Also returns the actions allowed on the resources and their templates
 type ResourceActions struct {
 	Links   []interface{}           `json:"links,omitempty"`
 	Content []ResourceActionContent `json:"content,omitempty"`
 }
 
+// ResourceActionContent - Detailed view of the resource provisioned and the operation allowed
 type ResourceActionContent struct {
-	Id              string          `json:"id,omitempty"`
+	ID              string          `json:"id,omitempty"`
 	Name            string          `json:"name,omitempty"`
 	ResourceTypeRef ResourceTypeRef `json:"resourceTypeRef,omitempty"`
 	Status          string          `json:"status,omitempty"`
-	RequestId       string          `json:"requestId,omitempty"`
+	RequestID       string          `json:"requestId,omitempty"`
 	RequestState    string          `json:"requestState,omitempty"`
 	Operations      []Operation     `json:"operations,omitempty"`
 	ResourceData    ResourceDataMap `json:"resourceData,omitempty"`
 }
 
+// ResourceTypeRef - type of resource (deployment, or machine, etc)
 type ResourceTypeRef struct {
-	Id    string `json:"id,omitempty"`
+	ID    string `json:"id,omitempty"`
 	Label string `json:"label,omitempty"`
 }
 
+// Operation - detailed view of an operation allowed on a resource
 type Operation struct {
 	Name        string `json:"name,omitempty"`
-	OperationId string `json:"id,omitempty"`
+	OperationID string `json:"id,omitempty"`
 	Description string `json:"description,omitempty"`
 	Type        string `json:"type,omitempty"`
 }
 
+// ResourceDataMap - properties of a provisioned resource
 type ResourceDataMap struct {
 	Entries []ResourceDataEntry `json:"entries,omitempty"`
 }
+
+// ResourceDataEntry - the property key and value of a resource
 type ResourceDataEntry struct {
 	Key   string                 `json:"key,omitempty"`
 	Value map[string]interface{} `json:"value,omitempty"`
@@ -200,42 +210,42 @@ func ResourceMachine() *schema.Resource {
 //and replace the values with user defined values added in .tf file.
 func resourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
-		utils.CATALOG_NAME: {
+		utils.CatalogName: {
 			Type:     schema.TypeString,
 			Optional: true,
 		},
-		utils.CATALOG_ID: {
-			Type:     schema.TypeString,
-			Computed: true,
-			Optional: true,
-		},
-		utils.BUSINESS_GROUP_ID: {
+		utils.CatalogID: {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
 		},
-		utils.BUSINESS_GROUP_NAME: {
+		utils.BusinessGroupID: {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
 		},
-		utils.WAIT_TIME_OUT: {
+		utils.BusinessGroupName: {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		utils.WaitTimeout: {
 			Type:     schema.TypeInt,
 			Optional: true,
 			Default:  15,
 		},
-		utils.REQUEST_STATUS: {
+		utils.RequestStatus: {
 			Type:     schema.TypeString,
 			Computed: true,
 			ForceNew: true,
 		},
-		utils.FAILED_MESSAGE: {
+		utils.FailedMessage: {
 			Type:     schema.TypeString,
 			Computed: true,
 			ForceNew: true,
 			Optional: true,
 		},
-		utils.DEPLOYMENT_CONFIGURATION: {
+		utils.DeploymentConfiguration: {
 			Type:     schema.TypeMap,
 			Optional: true,
 			Elem: &schema.Schema{
@@ -244,7 +254,7 @@ func resourceSchema() map[string]*schema.Schema {
 				Elem:     schema.TypeString,
 			},
 		},
-		utils.RESOURCE_CONFIGURATION: {
+		utils.ResourceConfiguration: {
 			Type:     schema.TypeMap,
 			Optional: true,
 			Computed: true,
@@ -254,7 +264,7 @@ func resourceSchema() map[string]*schema.Schema {
 				Elem:     schema.TypeString,
 			},
 		},
-		utils.CATALOG_CONFIGURATION: {
+		utils.CatalogConfiguration: {
 			Type:     schema.TypeMap,
 			Optional: true,
 			Elem: &schema.Schema{

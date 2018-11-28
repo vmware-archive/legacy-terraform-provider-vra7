@@ -2,7 +2,6 @@ package vrealize
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -16,10 +15,10 @@ import (
 )
 
 var (
-	log                     = logging.MustGetLogger(utils.LOGGER_ID)
+	log                     = logging.MustGetLogger(utils.LoggerID)
 	catalogItemName         string
 	catalogItemID           string
-	businessGroupId         string
+	businessGroupID         string
 	businessGroupName       string
 	waitTimeout             int
 	requestStatus           string
@@ -28,6 +27,19 @@ var (
 	resourceConfiguration   map[string]interface{}
 	catalogConfiguration    map[string]interface{}
 )
+
+// byLength type to sort component name list by it's name length
+type byLength []string
+
+func (s byLength) Less(i, j int) bool {
+	return len(s[i]) < len(s[j])
+}
+func (s byLength) Len() int {
+	return len(s)
+}
+func (s byLength) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
 
 //Replace the value for a given key in a catalog request template.
 func replaceValueInRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
@@ -152,7 +164,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Set request ID
 	d.SetId(catalogRequest.ID)
 	//Set request status
-	d.Set(utils.REQUEST_STATUS, "SUBMITTED")
+	d.Set(utils.RequestStatus, utils.Submitted)
 	return waitForRequestCompletion(d, meta)
 }
 
@@ -189,7 +201,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	ResourceActions := new(ResourceActions)
 	apiError := new(APIError)
 
-	path := fmt.Sprintf(utils.GET_RESOURCE_API, catalogItemRequestID)
+	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
 	_, err := vRAClient.HTTPClient.New().Get(path).
 		Receive(ResourceActions, apiError)
 
@@ -203,77 +215,76 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	// If any change made in resource_configuration.
-	if d.HasChange(utils.RESOURCE_CONFIGURATION) {
+	if d.HasChange(utils.ResourceConfiguration) {
 		for _, resources := range ResourceActions.Content {
-			if resources.ResourceTypeRef.Id == utils.INFRASTRUCTURE_VIRTUAL {
+			if resources.ResourceTypeRef.ID == utils.InfrastructureVirtual {
 				var reconfigureEnabled bool
-				var reconfigureActionId string
+				var reconfigureActionID string
 				for _, op := range resources.Operations {
-					if op.Name == utils.RECONFIGURE {
+					if op.Name == utils.Reconfigure {
 						reconfigureEnabled = true
-						reconfigureActionId = op.OperationId
+						reconfigureActionID = op.OperationID
 						break
 					}
 				}
 				// if reconfigure action is not available for any resource of the deployment
 				// return with an error message
 				if !reconfigureEnabled {
-					return fmt.Errorf("Update is not allowed for resource %v, your entitlement has no Reconfigure action enabled", resources.Id)
-				} else {
-					resourceData := resources.ResourceData
-					entries := resourceData.Entries
-					for _, entry := range entries {
-						if entry.Key == utils.COMPONENT {
-							entryValue := entry.Value
-							var componentName string
-							for k, v := range entryValue {
-								if k == "value" {
-									componentName = v.(string)
+					return fmt.Errorf("Update is not allowed for resource %v, your entitlement has no Reconfigure action enabled", resources.ID)
+				}
+				resourceData := resources.ResourceData
+				entries := resourceData.Entries
+				for _, entry := range entries {
+					if entry.Key == utils.Component {
+						entryValue := entry.Value
+						var componentName string
+						for k, v := range entryValue {
+							if k == "value" {
+								componentName = v.(string)
+							}
+						}
+						resourceActionTemplate := new(ResourceActionTemplate)
+						apiError := new(APIError)
+						log.Info("Retrieving reconfigure action template for the component: %v ", componentName)
+						getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, reconfigureActionID)
+						log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
+						response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
+							Receive(resourceActionTemplate, apiError)
+						response.Close = true
+						if !apiError.isEmpty() {
+							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
+							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
+						}
+						if err != nil {
+							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
+							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
+						}
+						configChanged := false
+						returnFlag := false
+						for configKey := range resourceConfiguration {
+							//compare resource list (resource_name) with user configuration fields
+							if strings.HasPrefix(configKey, componentName+".") {
+								//If user_configuration contains resource_list element
+								// then split user configuration key into resource_name and field_name
+								nameList := strings.Split(configKey, componentName+".")
+								//actionResponseInterface := actionResponse.(map[string]interface{})
+								//Function call which changes the template field values with  user values
+								//Replace existing values with new values in resource child template
+								resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(
+									resourceActionTemplate.Data,
+									nameList[1],
+									resourceConfiguration[configKey])
+								if returnFlag == true {
+									configChanged = true
 								}
 							}
-							resourceActionTemplate := new(ResourceActionTemplate)
-							apiError := new(APIError)
-							log.Info("Retrieving reconfigure action template for the component: %v ", componentName)
-							getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, resources.Id, reconfigureActionId)
-							log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
-							response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
-								Receive(resourceActionTemplate, apiError)
-							response.Close = true
-							if !apiError.isEmpty() {
-								log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
-								return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
-							}
+						}
+						// If template value got changed then set post call and update resource child
+						if configChanged != false {
+							postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, reconfigureActionID)
+							err := postResourceConfig(d, postActionTemplatePath, resourceActionTemplate, meta)
 							if err != nil {
-								log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
-								return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
-							}
-							configChanged := false
-							returnFlag := false
-							for configKey := range resourceConfiguration {
-								//compare resource list (resource_name) with user configuration fields
-								if strings.HasPrefix(configKey, componentName+".") {
-									//If user_configuration contains resource_list element
-									// then split user configuration key into resource_name and field_name
-									nameList := strings.Split(configKey, componentName+".")
-									//actionResponseInterface := actionResponse.(map[string]interface{})
-									//Function call which changes the template field values with  user values
-									//Replace existing values with new values in resource child template
-									resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(
-										resourceActionTemplate.Data,
-										nameList[1],
-										resourceConfiguration[configKey])
-									if returnFlag == true {
-										configChanged = true
-									}
-								}
-							}
-							// If template value got changed then set post call and update resource child
-							if configChanged != false {
-								postActionTemplatePath := fmt.Sprintf(utils.POST_ACTION_TEMPLATE_API, resources.Id, reconfigureActionId)
-								err := postResourceConfig(d, postActionTemplatePath, resourceActionTemplate, meta)
-								if err != nil {
-									return err
-								}
+								return err
 							}
 						}
 					}
@@ -293,14 +304,14 @@ func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourc
 		BodyJSON(resourceActionTemplate).Receive(resourceActionTemplate2, apiError2)
 
 	if response2.StatusCode != 201 {
-		oldData, _ := d.GetChange(utils.RESOURCE_CONFIGURATION)
-		d.Set(utils.RESOURCE_CONFIGURATION, oldData)
+		oldData, _ := d.GetChange(utils.ResourceConfiguration)
+		d.Set(utils.ResourceConfiguration, oldData)
 		return apiError2
 	}
 	response2.Close = true
 	if !apiError2.isEmpty() {
-		oldData, _ := d.GetChange(utils.RESOURCE_CONFIGURATION)
-		d.Set(utils.RESOURCE_CONFIGURATION, oldData)
+		oldData, _ := d.GetChange(utils.ResourceConfiguration)
+		d.Set(utils.ResourceConfiguration, oldData)
 		return apiError2
 	}
 	return nil
@@ -325,11 +336,11 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	// Update resource request status in state file
-	d.Set(utils.REQUEST_STATUS, resourceTemplate.Phase)
+	d.Set(utils.RequestStatus, resourceTemplate.Phase)
 	// If request is failed then set failed message in state file
-	if resourceTemplate.Phase == utils.FAILED {
+	if resourceTemplate.Phase == utils.Failed {
 		log.Errorf(resourceTemplate.RequestCompletion.CompletionDetails)
-		d.Set(utils.FAILED_MESSAGE, resourceTemplate.RequestCompletion.CompletionDetails)
+		d.Set(utils.FailedMessage, resourceTemplate.RequestCompletion.CompletionDetails)
 	}
 
 	requestResourceView, errTemplate := vRAClient.GetRequestResourceView(catalogItemRequestID)
@@ -339,33 +350,33 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 	resourceDataMap := make(map[string]map[string]interface{})
 	for _, resource := range requestResourceView.Content {
-		if resource.ResourceType == utils.INFRASTRUCTURE_VIRTUAL {
+		if resource.ResourceType == utils.InfrastructureVirtual {
 			resourceData := resource.ResourcesData
 			log.Info("The resource data map of the resource %v is: \n%v", resourceData.Component, resource.ResourcesData)
 			dataVals := make(map[string]interface{})
 			resourceDataMap[resourceData.Component] = dataVals
-			dataVals[utils.MACHINE_CPU] = resourceData.Cpu
-			dataVals[utils.MACHINE_STORAGE] = resourceData.Storage
-			dataVals[utils.IP_ADDRESS] = resourceData.IpAddress
-			dataVals[utils.MACHINE_MEMORY] = resourceData.Memory
-			dataVals[utils.MACHINE_NAME] = resourceData.MachineName
-			dataVals[utils.MACHINE_GUEST_OS] = resourceData.MachineGuestOperatingSystem
-			dataVals[utils.MACHINE_BP_NAME] = resourceData.MachineBlueprintName
-			dataVals[utils.MACHINE_TYPE] = resourceData.MachineType
-			dataVals[utils.MACHINE_RESERVATION_NAME] = resourceData.MachineReservationName
-			dataVals[utils.MACHINE_INTERFACE_TYPE] = resourceData.MachineInterfaceType
-			dataVals[utils.MACHINE_ID] = resourceData.MachineId
-			dataVals[utils.MACHINE_GROUP_NAME] = resourceData.MachineGroupName
-			dataVals[utils.MACHINE_DESTRUCTION_DATE] = resourceData.MachineDestructionDate
+			dataVals[utils.MachineCPU] = resourceData.CPU
+			dataVals[utils.MachineStorage] = resourceData.Storage
+			dataVals[utils.IPAddress] = resourceData.IPAddress
+			dataVals[utils.MachineMemory] = resourceData.Memory
+			dataVals[utils.MachineName] = resourceData.MachineName
+			dataVals[utils.MachineGuestOs] = resourceData.MachineGuestOperatingSystem
+			dataVals[utils.MachineBpName] = resourceData.MachineBlueprintName
+			dataVals[utils.MachineType] = resourceData.MachineType
+			dataVals[utils.MachineReservationName] = resourceData.MachineReservationName
+			dataVals[utils.MachineInterfaceType] = resourceData.MachineInterfaceType
+			dataVals[utils.MachineID] = resourceData.MachineID
+			dataVals[utils.MachineGroupName] = resourceData.MachineGroupName
+			dataVals[utils.MachineDestructionDate] = resourceData.MachineDestructionDate
 		}
 	}
-	resourceConfiguration, _ := d.Get(utils.RESOURCE_CONFIGURATION).(map[string]interface{})
+	resourceConfiguration, _ := d.Get(utils.ResourceConfiguration).(map[string]interface{})
 	changed := false
 
 	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, resourceDataMap)
 
 	if changed {
-		setError := d.Set(utils.RESOURCE_CONFIGURATION, resourceConfiguration)
+		setError := d.Set(utils.ResourceConfiguration, resourceConfiguration)
 		if setError != nil {
 			return fmt.Errorf(setError.Error())
 		}
@@ -431,7 +442,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	ResourceActions := new(ResourceActions)
 	apiError := new(APIError)
 
-	path := fmt.Sprintf(utils.GET_RESOURCE_API, catalogItemRequestID)
+	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
 	_, err := vRAClient.HTTPClient.New().Get(path).
 		Receive(ResourceActions, apiError)
 
@@ -445,14 +456,14 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	for _, resources := range ResourceActions.Content {
-		if resources.ResourceTypeRef.Id == utils.DEPLOYMENT_RESOURCE_TYPE {
+		if resources.ResourceTypeRef.ID == utils.DeploymentResourceType {
 			deploymentName := resources.Name
 			var destroyEnabled bool
 			var destroyActionID string
 			for _, op := range resources.Operations {
-				if op.Name == utils.DESTROY {
+				if op.Name == utils.Destroy {
 					destroyEnabled = true
-					destroyActionID = op.OperationId
+					destroyActionID = op.OperationID
 					break
 				}
 			}
@@ -460,33 +471,32 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			// return with an error message
 			if !destroyEnabled {
 				return fmt.Errorf("The deployment %v cannot be destroyed, your entitlement has no Destroy Deployment action enabled", deploymentName)
-			} else {
-				resourceActionTemplate := new(ResourceActionTemplate)
-				apiError := new(APIError)
-				getActionTemplatePath := fmt.Sprintf(utils.GET_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
-				log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.Id)
-				response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
-					Receive(resourceActionTemplate, apiError)
-				response.Close = true
-				if !apiError.isEmpty() {
-					log.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, apiError.Error())
-					return fmt.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, apiError.Error())
-				}
-				if err != nil {
-					log.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, err.Error())
-					return fmt.Errorf(utils.DESTROY_ACTION_TEMPLATE_ERROR, deploymentName, err.Error())
-				}
+			}
+			resourceActionTemplate := new(ResourceActionTemplate)
+			apiError := new(APIError)
+			getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, destroyActionID)
+			log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.ID)
+			response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
+				Receive(resourceActionTemplate, apiError)
+			response.Close = true
+			if !apiError.isEmpty() {
+				log.Errorf(utils.DestroyActionTemplateError, deploymentName, apiError.Error())
+				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, apiError.Error())
+			}
+			if err != nil {
+				log.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
+				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
+			}
 
-				postActionTemplatePath := fmt.Sprintf(utils.POST_ACTION_TEMPLATE_API, resources.Id, destroyActionID)
-				err = vRAClient.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
-				if err != nil {
-					return err
-				}
+			postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, destroyActionID)
+			err = vRAClient.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
+			if err != nil {
+				return err
 			}
 		}
 	}
 
-	waitTimeout := d.Get(utils.WAIT_TIME_OUT).(int) * 60
+	waitTimeout := d.Get(utils.WaitTimeout).(int) * 60
 	sleepFor := 30
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor) * time.Second)
@@ -497,7 +507,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 		}
 		// If resource create status is in_progress then skip delete call and throw an exception
 		// Note: vRA API should return error on destroy action if the request is in progress. Filed a bug
-		if d.Get(utils.REQUEST_STATUS).(string) == utils.IN_PROGRESS {
+		if d.Get(utils.RequestStatus).(string) == utils.InProgress {
 			return fmt.Errorf("Machine cannot be deleted while request is in-progress state. Please try again later. \nRun terraform refresh to get the latest state of your request")
 		}
 
@@ -509,7 +519,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	if d.Id() != "" {
 		d.SetId("")
-		return fmt.Errorf("Resource still being deleted after %v minutes", d.Get(utils.WAIT_TIME_OUT))
+		return fmt.Errorf("Resource still being deleted after %v minutes", d.Get(utils.WaitTimeout))
 	}
 	return nil
 }
@@ -532,44 +542,11 @@ func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ResourceActionTempla
 	return nil
 }
 
-//PowerOffMachine - To set resource power-off call
-func (vRAClient *APIClient) PowerOffMachine(powerOffTemplate *ActionTemplate, resourceViewTemplate *ResourceView) (*ActionResponseTemplate, error) {
-	//Get power-off resource URL from given template
-	var powerOffMachineactionURL string
-	powerOffMachineactionURL = getactionURL(resourceViewTemplate, "POST: {com.vmware.csp.component.iaas.proxy.provider@resource.action.name.machine.PowerOff}")
-	//Raise an exception if error got while fetching URL
-	if len(powerOffMachineactionURL) == 0 {
-		return nil, fmt.Errorf("resource is not created or not found")
-	}
-
-	actionResponse := new(ActionResponseTemplate)
-	apiError := new(APIError)
-
-	//Set a rest call to power-off the resource with resource power-off template as a data
-	response, err := vRAClient.HTTPClient.New().Post(powerOffMachineactionURL).
-		BodyJSON(powerOffTemplate).Receive(actionResponse, apiError)
-
-	response.Close = true
-	if response.StatusCode == 201 {
-		return actionResponse, nil
-	}
-
-	if !apiError.isEmpty() {
-		return nil, apiError
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, err
-}
-
 //GetRequestStatus - To read request status of resource
 // which is used to show information to user post create call.
-func (vRAClient *APIClient) GetRequestStatus(requestId string) (*RequestStatusView, error) {
+func (vRAClient *APIClient) GetRequestStatus(requestID string) (*RequestStatusView, error) {
 	//Form a URL to read request status
-	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", requestId)
+	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", requestID)
 	RequestStatusViewTemplate := new(RequestStatusView)
 	apiError := new(APIError)
 	//Set a REST call and fetch a resource request status
@@ -584,10 +561,10 @@ func (vRAClient *APIClient) GetRequestStatus(requestId string) (*RequestStatusVi
 }
 
 // GetDeploymentState - Read the state of a vRA7 Deployment
-func (vRAClient *APIClient) GetDeploymentState(CatalogRequestId string) (*ResourceView, error) {
+func (vRAClient *APIClient) GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
 	//Form an URL to fetch resource list view
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s"+
-		"/resourceViews", CatalogRequestId)
+		"/resourceViews", CatalogRequestID)
 	ResourceView := new(ResourceView)
 	apiError := new(APIError)
 	//Set a REST call to fetch resource view data
@@ -601,9 +578,9 @@ func (vRAClient *APIClient) GetDeploymentState(CatalogRequestId string) (*Resour
 	return ResourceView, nil
 }
 
-// Retrieves the resources that were provisioned as a result of a given request.
-func (vRAClient *APIClient) GetRequestResourceView(catalogRequestId string) (*RequestResourceView, error) {
-	path := fmt.Sprintf(utils.GET_REQUEST_RESOURCE_VIEW_API, catalogRequestId)
+// GetRequestResourceView retrieves the resources that were provisioned as a result of a given request.
+func (vRAClient *APIClient) GetRequestResourceView(catalogRequestID string) (*RequestResourceView, error) {
+	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, catalogRequestID)
 	requestResourceView := new(RequestResourceView)
 	apiError := new(APIError)
 	_, err := vRAClient.HTTPClient.New().Get(path).Receive(requestResourceView, apiError)
@@ -684,7 +661,7 @@ func checkResourceConfigValidity(requestTemplate *CatalogItemRequestTemplate) er
 	// there are invalid resource config keys in the terraform config file, abort and throw an error
 	if len(invalidKeys) > 0 {
 		log.Error("The resource_configuration in the config file has invalid component name(s): %v ", strings.Join(invalidKeys, ", "))
-		return fmt.Errorf(utils.CONFIG_INVALID_ERROR, strings.Join(invalidKeys, ", "))
+		return fmt.Errorf(utils.ConfigInvalidError, strings.Join(invalidKeys, ", "))
 	}
 	return nil
 }
@@ -697,41 +674,41 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 		return nil, fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
 	}
 
-	var catalogItemIdFromName string
-	var catalogItemNameFromId string
+	var catalogItemIDFromName string
+	var catalogItemNameFromID string
 	var err error
 	// if catalog item id is provided, fetch the catalog item name
 	if len(catalogItemName) > 0 {
-		catalogItemIdFromName, err = vRAClient.readCatalogItemIDByName(catalogItemName)
-		if err != nil || catalogItemIdFromName == "" {
+		catalogItemIDFromName, err = vRAClient.readCatalogItemIDByName(catalogItemName)
+		if err != nil || catalogItemIDFromName == "" {
 			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", catalogItemName, err)
 		}
-		log.Info("The catalog item id provided in the config is %v\n", catalogItemIdFromName)
+		log.Info("The catalog item id provided in the config is %v\n", catalogItemIDFromName)
 	}
 
 	// if catalog item name is provided, fetch the catalog item id
 	if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		catalogItemNameFromId, err = vRAClient.readCatalogItemNameByID(catalogItemID)
-		if err != nil || catalogItemNameFromId == "" {
+		catalogItemNameFromID, err = vRAClient.readCatalogItemNameByID(catalogItemID)
+		if err != nil || catalogItemNameFromID == "" {
 			return nil, fmt.Errorf("Error in finding catalog item name corresponding to the catlog item id %v: \n %v", catalogItemID, err)
 		}
-		log.Info("The catalog item name corresponding to the catalog item id in the config is:  %v\n", catalogItemNameFromId)
+		log.Info("The catalog item name corresponding to the catalog item id in the config is:  %v\n", catalogItemNameFromID)
 	}
 
 	// if both catalog item name and id are provided but does not belong to the same catalog item, throw an error
-	if len(catalogItemName) > 0 && len(catalogItemID) > 0 && (catalogItemIdFromName != catalogItemID || catalogItemNameFromId != catalogItemName) {
-		log.Error("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
-		return nil, errors.New("The catalog item name %s and id %s does not belong to the same catalog item. Provide either name or id.")
+	if len(catalogItemName) > 0 && len(catalogItemID) > 0 && (catalogItemIDFromName != catalogItemID || catalogItemNameFromID != catalogItemName) {
+		log.Error(utils.CatalogItemIDNameNotMatchingErr, catalogItemName, catalogItemID)
+		return nil, fmt.Errorf(utils.CatalogItemIDNameNotMatchingErr, catalogItemName, catalogItemID)
 	} else if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		d.Set(utils.CATALOG_ID, catalogItemID)
-		d.Set(utils.CATALOG_NAME, catalogItemNameFromId)
+		d.Set(utils.CatalogID, catalogItemID)
+		d.Set(utils.CatalogName, catalogItemNameFromID)
 	} else if len(catalogItemName) > 0 { // else if name is provided, use the id fetched from the name
-		d.Set(utils.CATALOG_ID, catalogItemIdFromName)
-		d.Set(utils.CATALOG_NAME, catalogItemName)
+		d.Set(utils.CatalogID, catalogItemIDFromName)
+		d.Set(utils.CatalogName, catalogItemName)
 	}
 
 	// update the catalogItemID var with the updated id
-	catalogItemID = d.Get(utils.CATALOG_ID).(string)
+	catalogItemID = d.Get(utils.CatalogID).(string)
 
 	// Get request template for catalog item.
 	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(catalogItemID)
@@ -745,24 +722,24 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 
 	}
 	// get the business group id from name
-	var businessGroupIdFromName string
+	var businessGroupIDFromName string
 	if len(businessGroupName) > 0 {
-		businessGroupIdFromName, err := vRAClient.GetBusinessGroupId(businessGroupName)
-		if err != nil || businessGroupIdFromName == "" {
+		businessGroupIDFromName, err = vRAClient.GetBusinessGroupID(businessGroupName)
+		if err != nil || businessGroupIDFromName == "" {
 			return nil, err
 		}
 	}
 
 	//if both business group name and id are provided but does not belong to the same business group, throw an error
-	if len(businessGroupName) > 0 && len(businessGroupId) > 0 && businessGroupIdFromName != businessGroupId {
-		log.Error("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupId)
-		return nil, errors.New(fmt.Sprintf("The business group name %s and id %s does not belong to the same business group. Provide either name or id.", businessGroupName, businessGroupId))
-	} else if len(businessGroupId) > 0 { // else if both are provided and matches or just id is provided, use id
-		log.Info("Setting business group id %s ", businessGroupId)
-		requestTemplate.BusinessGroupID = businessGroupId
+	if len(businessGroupName) > 0 && len(businessGroupID) > 0 && businessGroupIDFromName != businessGroupID {
+		log.Error(utils.BusinessGroupIDNameNotMatchingErr, businessGroupName, businessGroupID)
+		return nil, fmt.Errorf(utils.BusinessGroupIDNameNotMatchingErr, businessGroupName, businessGroupID)
+	} else if len(businessGroupID) > 0 { // else if both are provided and matches or just id is provided, use id
+		log.Info("Setting business group id %s ", businessGroupID)
+		requestTemplate.BusinessGroupID = businessGroupID
 	} else if len(businessGroupName) > 0 { // else if name is provided, use the id fetched from the name
-		log.Info("Setting business group id %s for the group %s ", businessGroupIdFromName, businessGroupName)
-		requestTemplate.BusinessGroupID = businessGroupIdFromName
+		log.Info("Setting business group id %s for the group %s ", businessGroupIDFromName, businessGroupName)
+		requestTemplate.BusinessGroupID = businessGroupIDFromName
 	}
 	return requestTemplate, nil
 }
@@ -770,40 +747,40 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 // check the request status on apply and update
 func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 
-	waitTimeout := d.Get(utils.WAIT_TIME_OUT).(int) * 60
+	waitTimeout := d.Get(utils.WaitTimeout).(int) * 60
 	sleepFor := 30
-	request_status := ""
+	requestStatus := ""
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		log.Info("Waiting for %d seconds before checking request status.", sleepFor)
 		time.Sleep(time.Duration(sleepFor) * time.Second)
 
 		readResource(d, meta)
 
-		request_status = d.Get(utils.REQUEST_STATUS).(string)
-		log.Info("Checking to see if resource is created. Status: %s.", request_status)
-		if request_status == utils.SUCCESSFUL {
+		requestStatus = d.Get(utils.RequestStatus).(string)
+		log.Info("Checking to see if resource is created. Status: %s.", requestStatus)
+		if requestStatus == utils.Successful {
 			log.Info("Resource creation SUCCESSFUL.")
 			return nil
-		} else if request_status == utils.FAILED {
-			log.Error("Request Failed with message %v ", d.Get(utils.FAILED_MESSAGE))
+		} else if requestStatus == utils.Failed {
+			log.Error("Request Failed with message %v ", d.Get(utils.FailedMessage))
 			//If request is failed during the time then
 			//unset resource details from state.
 			d.SetId("")
-			return fmt.Errorf("Request failed \n %v ", d.Get(utils.FAILED_MESSAGE))
-		} else if request_status == utils.IN_PROGRESS {
+			return fmt.Errorf("Request failed \n %v ", d.Get(utils.FailedMessage))
+		} else if requestStatus == utils.InProgress {
 			log.Info("Resource creation is still IN PROGRESS.")
 		} else {
-			log.Info("Resource creation request status: %s.", request_status)
+			log.Info("Resource creation request status: %s.", requestStatus)
 		}
 	}
 
 	// The execution has timed out while still IN PROGRESS.
 	// The user will need to use 'terraform refresh' at a later point to resolve this.
-	return fmt.Errorf("Resource creation has timed out !!")
+	return fmt.Errorf("Resource creation has timed out")
 }
 
-// Retrieve business group id from business group name
-func (vRAClient *APIClient) GetBusinessGroupId(businessGroupName string) (string, error) {
+// GetBusinessGroupID retrieves business group id from business group name
+func (vRAClient *APIClient) GetBusinessGroupID(businessGroupName string) (string, error) {
 
 	path := "/identity/api/tenants/" + vRAClient.Tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
 	log.Info("Fetching business group id from name..GET %s ", path)
@@ -819,29 +796,29 @@ func (vRAClient *APIClient) GetBusinessGroupId(businessGroupName string) (string
 	// BusinessGroups array will contain only one BusinessGroup element containing the BG
 	// with the name businessGroupName.
 	// Fetch the id of that BG
-	return BusinessGroups.Content[0].Id, nil
+	return BusinessGroups.Content[0].ID, nil
 }
 
 // read the config file
 func readProviderConfiguration(d *schema.ResourceData) {
 
 	log.Info("Reading the provider configuration data.....")
-	catalogItemName = strings.TrimSpace(d.Get(utils.CATALOG_NAME).(string))
+	catalogItemName = strings.TrimSpace(d.Get(utils.CatalogName).(string))
 	log.Info("Catalog item name: %v ", catalogItemName)
-	catalogItemID = strings.TrimSpace(d.Get(utils.CATALOG_ID).(string))
+	catalogItemID = strings.TrimSpace(d.Get(utils.CatalogID).(string))
 	log.Info("Catalog item ID: %v", catalogItemID)
-	businessGroupName = strings.TrimSpace(d.Get(utils.BUSINESS_GROUP_NAME).(string))
+	businessGroupName = strings.TrimSpace(d.Get(utils.BusinessGroupName).(string))
 	log.Info("Business Group name: %v", businessGroupName)
-	businessGroupId = strings.TrimSpace(d.Get(utils.BUSINESS_GROUP_ID).(string))
-	log.Info("Business Group Id: %v", businessGroupId)
-	waitTimeout = d.Get(utils.WAIT_TIME_OUT).(int) * 60
+	businessGroupID = strings.TrimSpace(d.Get(utils.BusinessGroupID).(string))
+	log.Info("Business Group Id: %v", businessGroupID)
+	waitTimeout = d.Get(utils.WaitTimeout).(int) * 60
 	log.Info("Wait time out: %v ", waitTimeout)
-	failedMessage = strings.TrimSpace(d.Get(utils.FAILED_MESSAGE).(string))
+	failedMessage = strings.TrimSpace(d.Get(utils.FailedMessage).(string))
 	log.Info("Failed message: %v ", failedMessage)
-	resourceConfiguration = d.Get(utils.RESOURCE_CONFIGURATION).(map[string]interface{})
+	resourceConfiguration = d.Get(utils.ResourceConfiguration).(map[string]interface{})
 	log.Info("Resource Configuration: %v ", resourceConfiguration)
-	deploymentConfiguration = d.Get(utils.DEPLOYMENT_CONFIGURATION).(map[string]interface{})
+	deploymentConfiguration = d.Get(utils.DeploymentConfiguration).(map[string]interface{})
 	log.Info("Deployment Configuration: %v ", deploymentConfiguration)
-	catalogConfiguration = d.Get(utils.CATALOG_CONFIGURATION).(map[string]interface{})
+	catalogConfiguration = d.Get(utils.CatalogConfiguration).(map[string]interface{})
 	log.Info("Catalog configuration: %v ", catalogConfiguration)
 }

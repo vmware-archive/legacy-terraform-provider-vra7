@@ -2,10 +2,10 @@ package utils
 
 import "runtime"
 
+// GetPathSeparator returns the path separator based on the OS type
 func GetPathSeparator() string {
-	if runtime.GOOS == WINDOWS_OS {
-		return WINDOWS_PATH_SEPARATOR
-	} else {
-		return UNIX_PATH_SEPARATOR
+	if runtime.GOOS == WindowsOs {
+		return WindowsPathSeparator
 	}
+	return UnixPathSeparator
 }
