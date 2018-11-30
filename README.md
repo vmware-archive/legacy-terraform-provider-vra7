@@ -11,8 +11,7 @@ These instructions will get you a copy of the project up and run on your local m
 
 To get the vRA plugin up and running you need the following things.
 * [Terraform 0.9 or above](https://www.terraform.io/downloads.html)
-* [Go Language 1.9.2 or above](https://golang.org/dl/)
-* [dep - new dependency management tool for Go](https://github.com/golang/dep)
+* [Go Language 1.11 or above](https://golang.org/dl/)
 
 ## Project Setup
 
@@ -89,7 +88,6 @@ Clone repo code into go project using *go get*
 Navigate to */home/<USER>/TerraformPluginProject/src/github.com/vmware/terraform-provider-vra7* and run go build command to generate plugin binary
 
 ```
-    dep ensure
     go build -o /home/<USER>/TerraformPluginProject/bin/terraform-provider-vra7
 
 ```
@@ -99,7 +97,6 @@ Navigate to */home/<USER>/TerraformPluginProject/src/github.com/vmware/terraform
 Navigate to *C:\TerraformPluginProject\src\github.com\vmware\terraform-provider-vra7* and run go build command to generate plugin binary
 
 ```
-    dep ensure
     go build -o C:\TerraformPluginProject\bin\terraform-provider-vra7.exe
 
 ```
