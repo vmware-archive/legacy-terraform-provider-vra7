@@ -15,7 +15,9 @@ build:
 check:
 	@gofmt -d ${SRC}
 	@test -z "$(shell gofmt -l ${SRC} | tee /dev/stderr)" || { echo "Fix formatting issues with 'make fmt'"; exit 1; }
-	@for d in $$(go list ./... | grep -v /vendor/); do golint $${d}; done
+	@ret=0 && for d in $$(go list ./... | grep -v /vendor/); do \
+		test -z "$$(golint $${d} | tee /dev/stderr)" || ret=1; \
+		done; exit $$ret
 	@go tool vet main.go
 	@go tool vet vrealize
 	go test ./...
