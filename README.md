@@ -41,6 +41,11 @@ export GOROOT=/usr/local/go
 export GOPATH=/home/<user>/TerraformPluginProject
 ```
 
+*GO111MODULE is a golang module mode flag (outside of GOPATH, you do not need to set GO111MODULE to activate module mode)*
+```
+export GO111MODULE=on
+```
+
 **Windows Users**
 
 *GOROOT is a golang library path*
@@ -51,6 +56,11 @@ set GOROOT=C:\Go
 *GOPATH is a path pointing toward the source code directory*
 ```
 set GOPATH=C:\TerraformPluginProject
+```
+
+*GO111MODULE is a golang module mode flag (outside of GOPATH, you do not need to set GO111MODULE to activate module mode)*
+```
+set GO111MODULE=on
 ```
 
 ## Set terraform provider
