@@ -184,7 +184,7 @@ resource "vra7_resource" "example_machine1" {
          Windows2016.cpu =  "2"
      }
      catalog_configuration = {
-         lease_days = "5"
+         _leaseDays = "5"
      }
      deployment_configuration = {
          reasons      = "I have some"
