@@ -45,7 +45,7 @@ func GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTem
 	}
 
 	var requestTemplate CatalogItemRequestTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody, &requestTemplate)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &requestTemplate)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -75,7 +75,7 @@ func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 	}
 
 	var response CatalogItem
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
@@ -85,10 +85,12 @@ func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 // ReadCatalogItemIdByName - To read id of catalog from vRA using catalog_name
 // func ReadCatalogItemByName(catalogName string) (string, error) {
 //
-// 	path := "/catalog-service/api/consumer/entitledCatalogItemViews?%24filter=name+eq+'" + catalogName + "'"
-// 	log.Info("Fetching catalog item id from name..GET %s ", path)
-// 	url := client.BuildEncodedURL(path, nil)
-// 	respBody, respErr := client.Get(url, nil)
+// 	path := "/catalog-service/api/consumer/entitledCatalogItemViews"
+// 	log.Info("Fetching business group id from name..GET %s ", path)
+// 	uri := client.BuildEncodedURL(path+"?$filter=name eq "+catalogName, nil)
+// 	customURL := strings.Replace(uri, "%3F", "?", -1)
+//
+// 	respBody, respErr := client.Get(customURL, nil)
 // 	if respErr != nil {
 // 		return "", respErr
 // 	}
@@ -100,6 +102,7 @@ func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 // 	}
 // 	log.Info("the catalog item is %v ", response.CatalogItem.ID)
 // 	return response.CatalogItem.ID, nil
+// }
 
 //readCatalogItemIdByName - To read id of catalog from vRA using catalog_name
 func ReadCatalogItemByName(catalogName string) (string, error) {
@@ -115,25 +118,15 @@ func ReadCatalogItemByName(catalogName string) (string, error) {
 	if respErr != nil {
 		return "", respErr
 	}
+	if respBody.StatusCode != 200 {
+		return "", fmt.Errorf("Error with status code %v", respBody.StatusCode)
+	}
 
 	var template EntitledCatalogItemViews
-	unmarshallErr := utils.UnmarshalJSON(respBody, &template)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &template)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
-
-	//Fetch all catalogs from vRA
-	// path = fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews?page=1&"+
-	// 	"limit=%d", template.Metadata.TotalElements)
-	// resp, errResp := c.HTTPClient.New().Get(path).Receive(template, apiError)
-	//
-	// if !apiError.isEmpty() {
-	// 	return "", apiError
-	// }
-	//
-	// if resp.StatusCode != 200 {
-	// 	return "", errResp
-	// }
 
 	var catalogItemNameArray []string
 	interfaceArray := template.Content.([]interface{})
@@ -169,6 +162,5 @@ func ReadCatalogItemByName(catalogName string) (string, error) {
 		return "", fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
 			"Please select from above.", punctuation, len(catalogItemNameArray), errorMessage)
 	}
-	log.Info("the catalog id is %v ========= ", catalogItemID)
 	return catalogItemID, nil
 }

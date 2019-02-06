@@ -88,6 +88,7 @@ func DoRequest(req *APIRequest, login bool) (*APIResponse, error) {
 
 	}
 	r.Header.Add(ConnectionHeader, CloseConnection)
+
 	resp, err := apiClient.Client.Do(r)
 	if err != nil {
 		log.Error("An error occurred when calling %v on %v. Error: %v", req.Method, req.URL, err)
@@ -131,7 +132,6 @@ func (apiClient *APIClient) Authenticate() (string, error) {
 	req.AddHeader(AcceptHeader, AppJson)
 	req.AddHeader(ContentTypeHeader, AppJson)
 
-	log.Info("the request object inside Authenticate is %v ", req)
 	return DoLogin(req)
 }
 

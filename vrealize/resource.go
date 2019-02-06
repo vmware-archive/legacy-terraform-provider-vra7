@@ -206,7 +206,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	var resourceActions ResourceActions
-	unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActions)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActions)
 	if unmarshallErr != nil {
 		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
@@ -252,7 +252,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						}
 
 						var resourceActionTemplate ResourceActionTemplate
-						unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActionTemplate)
+						unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActionTemplate)
 						if unmarshallErr != nil {
 							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
 							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
@@ -295,13 +295,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 
 func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate ResourceActionTemplate) error {
 
-	//TODO: Fix this
-	// if response2.StatusCode != 201 {
-	// 	oldData, _ := d.GetChange(utils.ResourceConfiguration)
-	// 	d.Set(utils.ResourceConfiguration, oldData)
-	// 	return apiError2
-	// }
-
 	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
 	url := client.BuildEncodedURL(reconfigPostLink, nil)
 	respBody, respErr := client.Post(url, buffer, nil)
@@ -312,8 +305,14 @@ func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourc
 		return respErr
 	}
 
+	if respBody.StatusCode != 201 {
+		oldData, _ := d.GetChange(utils.ResourceConfiguration)
+		d.Set(utils.ResourceConfiguration, oldData)
+		return respErr
+	}
+
 	var response ResourceActionTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		oldData, _ := d.GetChange(utils.ResourceConfiguration)
 		d.Set(utils.ResourceConfiguration, oldData)
@@ -450,7 +449,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	var resourceActions ResourceActions
-	unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActions)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActions)
 	if unmarshallErr != nil {
 		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
@@ -484,7 +483,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			}
 
 			var resourceActionTemplate ResourceActionTemplate
-			unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActionTemplate)
+			unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActionTemplate)
 			if unmarshallErr != nil {
 				log.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
 				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
@@ -530,16 +529,15 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 //DestroyMachine - To set resource destroy call
 func DestroyMachine(destroyTemplate ResourceActionTemplate, destroyActionURL string) error {
 
-	//TODO: fix this
-	// if resp.StatusCode != 201 {
-	// 	log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
-	// 	return err
-	// }
 	buffer, _ := utils.MarshalToJSON(destroyTemplate)
 	url := client.BuildEncodedURL(destroyActionURL, nil)
-	_, respErr := client.Post(url, buffer, nil)
+	resp, respErr := client.Post(url, buffer, nil)
 	if respErr != nil {
 		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
+		return respErr
+	}
+	if resp.StatusCode != 201 {
+		log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
 		return respErr
 	}
 	return nil
@@ -557,7 +555,7 @@ func GetRequestStatus(requestID string) (*RequestStatusView, error) {
 	}
 
 	var response RequestStatusView
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -576,7 +574,7 @@ func GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
 	}
 
 	var response ResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -593,7 +591,7 @@ func GetRequestResourceView(catalogRequestID string) (*RequestResourceView, erro
 	}
 
 	var response RequestResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -615,7 +613,7 @@ func RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRe
 	}
 
 	var response CatalogRequest
-	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -780,17 +778,21 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 // GetBusinessGroupID retrieves business group id from business group name
 func GetBusinessGroupID(businessGroupName string, tenant string) (string, error) {
 
-	path := "/identity/api/tenants/" + tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
+	path := "/identity/api/tenants/" + tenant + "/subtenants"
+
 	log.Info("Fetching business group id from name..GET %s ", path)
 
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	uri := client.BuildEncodedURL(path+"?$filter=name eq "+businessGroupName, nil)
+	customURL := strings.Replace(uri, "%3F", "?", -1)
+
+	//url := client.BuildEncodedURL(cus, nil)
+	respBody, respErr := client.Get(customURL, nil)
 	if respErr != nil {
 		return "", respErr
 	}
 
 	var businessGroup BusinessGroups
-	unmarshallErr := utils.UnmarshalJSON(respBody, &businessGroup)
+	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &businessGroup)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}

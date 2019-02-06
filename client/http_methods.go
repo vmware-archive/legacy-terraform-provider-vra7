@@ -25,7 +25,7 @@ const (
 	DELETE = "DELETE"
 )
 
-func Get(encodedUrl string, headers map[string]string) ([]byte, error) {
+func Get(encodedUrl string, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  GET,
 		URL:     encodedUrl,
@@ -34,7 +34,7 @@ func Get(encodedUrl string, headers map[string]string) ([]byte, error) {
 	return doRequest(req)
 }
 
-func Post(url string, body io.Reader, headers map[string]string) ([]byte, error) {
+func Post(url string, body io.Reader, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  POST,
 		URL:     url,
@@ -44,7 +44,7 @@ func Post(url string, body io.Reader, headers map[string]string) ([]byte, error)
 	return doRequest(req)
 }
 
-func Put(url string, body io.Reader, headers map[string]string) ([]byte, error) {
+func Put(url string, body io.Reader, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  PUT,
 		URL:     url,
@@ -54,7 +54,7 @@ func Put(url string, body io.Reader, headers map[string]string) ([]byte, error) 
 	return doRequest(req)
 }
 
-func Patch(url string, body io.Reader, headers map[string]string) ([]byte, error) {
+func Patch(url string, body io.Reader, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  PATCH,
 		URL:     url,
@@ -64,7 +64,7 @@ func Patch(url string, body io.Reader, headers map[string]string) ([]byte, error
 	return doRequest(req)
 }
 
-func Delete(url string, body io.Reader, headers map[string]string) ([]byte, error) {
+func Delete(url string, body io.Reader, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  DELETE,
 		URL:     url,
@@ -74,10 +74,10 @@ func Delete(url string, body io.Reader, headers map[string]string) ([]byte, erro
 	return doRequest(req)
 }
 
-func doRequest(req *APIRequest) ([]byte, error) {
+func doRequest(req *APIRequest) (*APIResponse, error) {
 	apiResp, err := DoRequest(req, false)
 	if err != nil {
 		return nil, err
 	}
-	return apiResp.Body, nil
+	return apiResp, nil
 }
