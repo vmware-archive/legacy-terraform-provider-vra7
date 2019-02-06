@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/vmware/terraform-provider-vra7/client"
+	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
 //CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
@@ -20,6 +23,7 @@ type CatalogItemRequestTemplate struct {
 //catalogName - This struct holds catalog name from json response.
 type catalogName struct {
 	Name string `json:"name"`
+	ID   string `json:"catalogItemId"`
 }
 
 //CatalogItem - This struct holds the value of response of catalog item list
@@ -28,32 +32,27 @@ type CatalogItem struct {
 }
 
 //GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
-func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTemplate, error) {
+func GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTemplate, error) {
+
 	//Form a path to read catalog request template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s/requests/template",
 		catalogItemID)
-
-	log.Info("GetCatalogItemRequestTemplate->path %v\n", path)
-
-	requestTemplate := new(CatalogItemRequestTemplate)
-	apiError := new(APIError)
-	//Make the REST call to get catalog request template
-	_, err := c.HTTPClient.New().Get(path).Receive(requestTemplate, apiError)
-
-	if err != nil {
-		return nil, err
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return nil, respErr
 	}
 
-	if !apiError.isEmpty() {
-		return nil, apiError
+	var requestTemplate CatalogItemRequestTemplate
+	unmarshallErr := utils.UnmarshalJSON(respBody, &requestTemplate)
+	if unmarshallErr != nil {
+		return nil, unmarshallErr
 	}
-	//Return catalog item template
-	log.Info("GetCatalogItemRequestTemplate->requestTemplate %v\n", requestTemplate)
-	return requestTemplate, nil
+	return &requestTemplate, nil
 }
 
-type entitledCatalogItemViews struct {
+type EntitledCatalogItemViews struct {
 	Links    interface{} `json:"links"`
 	Content  interface{} `json:"content"`
 	Metadata Metadata    `json:"metadata"`
@@ -65,29 +64,45 @@ type Metadata struct {
 }
 
 // readCatalogItemNameByID - This function returns the catalog item name using catalog item ID
-func (c *APIClient) readCatalogItemNameByID(catalogItemID string) (string, error) {
-	//Form a path to read catalog template via REST call
+func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
+
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s", catalogItemID)
-
-	template := new(CatalogItem)
-	apiError := new(APIError)
-	//Make a REST call to get catalog template
-	_, err := c.HTTPClient.New().Get(path).Receive(template, apiError)
-
-	if err != nil {
-		return "", err
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return "", respErr
 	}
 
-	if !apiError.isEmpty() {
-		return "", apiError
+	var response CatalogItem
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
+		return "", unmarshallErr
 	}
-	//Return catalog Name
-	return template.CatalogItem.Name, nil
+	return response.CatalogItem.Name, nil
 }
 
+// ReadCatalogItemIdByName - To read id of catalog from vRA using catalog_name
+// func ReadCatalogItemByName(catalogName string) (string, error) {
+//
+// 	path := "/catalog-service/api/consumer/entitledCatalogItemViews?%24filter=name+eq+'" + catalogName + "'"
+// 	log.Info("Fetching catalog item id from name..GET %s ", path)
+// 	url := client.BuildEncodedURL(path, nil)
+// 	respBody, respErr := client.Get(url, nil)
+// 	if respErr != nil {
+// 		return "", respErr
+// 	}
+//
+// 	var response CatalogItem
+// 	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+// 	if unmarshallErr != nil {
+// 		return "", unmarshallErr
+// 	}
+// 	log.Info("the catalog item is %v ", response.CatalogItem.ID)
+// 	return response.CatalogItem.ID, nil
+
 //readCatalogItemIdByName - To read id of catalog from vRA using catalog_name
-func (c *APIClient) readCatalogItemIDByName(catalogName string) (string, error) {
+func ReadCatalogItemByName(catalogName string) (string, error) {
 	var catalogItemID string
 
 	log.Info("readCatalogItemIdByName->catalog_name %v\n", catalogName)
@@ -95,31 +110,30 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (string, error) 
 	//Set a call to read number of catalogs from vRA
 	path := fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews")
 
-	template := new(entitledCatalogItemViews)
-	apiError := new(APIError)
-
-	_, preErr := c.HTTPClient.New().Get(path).Receive(template, apiError)
-
-	if preErr != nil {
-		return "", preErr
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return "", respErr
 	}
 
-	if !apiError.isEmpty() {
-		return "", apiError
+	var template EntitledCatalogItemViews
+	unmarshallErr := utils.UnmarshalJSON(respBody, &template)
+	if unmarshallErr != nil {
+		return "", unmarshallErr
 	}
 
 	//Fetch all catalogs from vRA
-	path = fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews?page=1&"+
-		"limit=%d", template.Metadata.TotalElements)
-	resp, errResp := c.HTTPClient.New().Get(path).Receive(template, apiError)
-
-	if !apiError.isEmpty() {
-		return "", apiError
-	}
-
-	if resp.StatusCode != 200 {
-		return "", errResp
-	}
+	// path = fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews?page=1&"+
+	// 	"limit=%d", template.Metadata.TotalElements)
+	// resp, errResp := c.HTTPClient.New().Get(path).Receive(template, apiError)
+	//
+	// if !apiError.isEmpty() {
+	// 	return "", apiError
+	// }
+	//
+	// if resp.StatusCode != 200 {
+	// 	return "", errResp
+	// }
 
 	var catalogItemNameArray []string
 	interfaceArray := template.Content.([]interface{})
@@ -155,9 +169,6 @@ func (c *APIClient) readCatalogItemIDByName(catalogName string) (string, error) 
 		return "", fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
 			"Please select from above.", punctuation, len(catalogItemNameArray), errorMessage)
 	}
-
-	if !apiError.isEmpty() {
-		return "", apiError
-	}
+	log.Info("the catalog id is %v ========= ", catalogItemID)
 	return catalogItemID, nil
 }

@@ -2,8 +2,10 @@ package vrealize
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
+	vra_client "github.com/vmware/terraform-provider-vra7/client"
 )
 
 //Provider - This function initializes the provider schema
@@ -53,15 +55,13 @@ func providerSchema() map[string]*schema.Schema {
 //Function use - To authenticate terraform provider
 func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	//Create a client handle to perform REST calls for various operations upon the resource
-	client := NewClient(r.Get("username").(string),
-		r.Get("password").(string),
-		r.Get("tenant").(string),
-		r.Get("host").(string),
-		r.Get("insecure").(bool),
-	)
+
+	vraClient := vra_client.NewClient(r)
+
+	log.Info("inside provider %v ", vraClient)
 
 	//Authenticate user
-	err := client.Authenticate()
+	_, err := vraClient.Authenticate()
 
 	//Raise an error on authentication fail
 	if err != nil {
@@ -69,7 +69,7 @@ func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	}
 
 	//Return client handle on success
-	return &client, nil
+	return &vraClient, nil
 }
 
 //Function use - set machine resource details based on machine type

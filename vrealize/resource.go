@@ -1,7 +1,6 @@
 package vrealize
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
@@ -10,7 +9,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
+	"github.com/vmware/terraform-provider-vra7/client"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
@@ -85,10 +85,9 @@ func addValueToRequestTemplate(templateInterface map[string]interface{}, field s
 // The Deployment is produced by invoking a catalog item that is specified in the configuration.
 func createResource(d *schema.ResourceData, meta interface{}) error {
 	// Get client handle
-	vRAClient := meta.(*APIClient)
 	readProviderConfiguration(d)
 
-	requestTemplate, validityErr := checkConfigValuesValidity(vRAClient, d)
+	requestTemplate, validityErr := checkConfigValuesValidity(d)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -156,7 +155,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	log.Info("Updated template - %v\n", requestTemplate.Data)
 
 	//Fire off a catalog item request to create a deployment.
-	catalogRequest, err := vRAClient.RequestCatalogItem(requestTemplate)
+	catalogRequest, err := RequestCatalogItem(requestTemplate)
 
 	if err != nil {
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
@@ -186,10 +185,9 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 	// Get client handle
-	vRAClient := meta.(*APIClient)
 	readProviderConfiguration(d)
 
-	requestTemplate, validityErr := checkConfigValuesValidity(vRAClient, d)
+	requestTemplate, validityErr := checkConfigValuesValidity(d)
 	if validityErr != nil {
 		return validityErr
 	}
@@ -198,25 +196,25 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		return validityErr
 	}
 
-	ResourceActions := new(ResourceActions)
-	apiError := new(APIError)
-
 	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
-	_, err := vRAClient.HTTPClient.New().Get(path).
-		Receive(ResourceActions, apiError)
 
-	if err != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, err.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, respErr.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, respErr.Error())
 	}
-	if apiError != nil && !apiError.isEmpty() {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Errors)
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Errors)
+
+	var resourceActions ResourceActions
+	unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActions)
+	if unmarshallErr != nil {
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
 	}
 
 	// If any change made in resource_configuration.
 	if d.HasChange(utils.ResourceConfiguration) {
-		for _, resources := range ResourceActions.Content {
+		for _, resources := range resourceActions.Content {
 			if resources.ResourceTypeRef.ID == utils.InfrastructureVirtual {
 				var reconfigureEnabled bool
 				var reconfigureActionID string
@@ -243,21 +241,21 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 								componentName = v.(string)
 							}
 						}
-						resourceActionTemplate := new(ResourceActionTemplate)
-						apiError := new(APIError)
 						log.Info("Retrieving reconfigure action template for the component: %v ", componentName)
 						getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, reconfigureActionID)
 						log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
-						response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
-							Receive(resourceActionTemplate, apiError)
-						response.Close = true
-						if !apiError.isEmpty() {
-							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
-							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, apiError.Error())
+						url = client.BuildEncodedURL(getActionTemplatePath, nil)
+						respBody, respErr := client.Get(url, nil)
+						if respErr != nil {
+							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, respErr.Error())
+							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, respErr.Error())
 						}
-						if err != nil {
-							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
-							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
+
+						var resourceActionTemplate ResourceActionTemplate
+						unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActionTemplate)
+						if unmarshallErr != nil {
+							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
+							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
 						}
 						configChanged := false
 						returnFlag := false
@@ -282,7 +280,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						// If template value got changed then set post call and update resource child
 						if configChanged != false {
 							postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, reconfigureActionID)
-							err := postResourceConfig(d, postActionTemplatePath, resourceActionTemplate, meta)
+							err := postResourceConfig(d, postActionTemplatePath, resourceActionTemplate)
 							if err != nil {
 								return err
 							}
@@ -295,24 +293,31 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 	return waitForRequestCompletion(d, meta)
 }
 
-func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate *ResourceActionTemplate, meta interface{}) error {
-	vRAClient := meta.(*APIClient)
-	resourceActionTemplate2 := new(ResourceActionTemplate)
-	apiError2 := new(APIError)
+func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate ResourceActionTemplate) error {
 
-	response2, _ := vRAClient.HTTPClient.New().Post(reconfigPostLink).
-		BodyJSON(resourceActionTemplate).Receive(resourceActionTemplate2, apiError2)
+	//TODO: Fix this
+	// if response2.StatusCode != 201 {
+	// 	oldData, _ := d.GetChange(utils.ResourceConfiguration)
+	// 	d.Set(utils.ResourceConfiguration, oldData)
+	// 	return apiError2
+	// }
 
-	if response2.StatusCode != 201 {
+	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
+	url := client.BuildEncodedURL(reconfigPostLink, nil)
+	respBody, respErr := client.Post(url, buffer, nil)
+	if respErr != nil {
 		oldData, _ := d.GetChange(utils.ResourceConfiguration)
 		d.Set(utils.ResourceConfiguration, oldData)
-		return apiError2
+		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
+		return respErr
 	}
-	response2.Close = true
-	if !apiError2.isEmpty() {
+
+	var response ResourceActionTemplate
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
 		oldData, _ := d.GetChange(utils.ResourceConfiguration)
 		d.Set(utils.ResourceConfiguration, oldData)
-		return apiError2
+		return unmarshallErr
 	}
 	return nil
 }
@@ -326,9 +331,8 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 	log.Info("Calling read resource to get the current resource status of the request: %v ", catalogItemRequestID)
 	// Get client handle
-	vRAClient := meta.(*APIClient)
 	// Get requested status
-	resourceTemplate, errTemplate := vRAClient.GetRequestStatus(catalogItemRequestID)
+	resourceTemplate, errTemplate := GetRequestStatus(catalogItemRequestID)
 
 	if errTemplate != nil {
 		log.Errorf("Resource view failed to load:  %v", errTemplate)
@@ -343,7 +347,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		d.Set(utils.FailedMessage, resourceTemplate.RequestCompletion.CompletionDetails)
 	}
 
-	requestResourceView, errTemplate := vRAClient.GetRequestResourceView(catalogItemRequestID)
+	requestResourceView, errTemplate := GetRequestResourceView(catalogItemRequestID)
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
@@ -430,32 +434,29 @@ func convertInterfaceToString(interfaceData interface{}) string {
 func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
-	//Get client handle
-	vRAClient := meta.(*APIClient)
-
 	// Throw an error if request ID has no value or empty value
 	if len(d.Id()) == 0 {
 		return fmt.Errorf("Resource not found")
 	}
 	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
 
-	ResourceActions := new(ResourceActions)
-	apiError := new(APIError)
-
 	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
-	_, err := vRAClient.HTTPClient.New().Get(path).
-		Receive(ResourceActions, apiError)
 
-	if err != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, err.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
-	}
-	if apiError != nil && !apiError.isEmpty() {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, apiError.Errors)
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, apiError.Errors)
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, respErr.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, respErr.Error())
 	}
 
-	for _, resources := range ResourceActions.Content {
+	var resourceActions ResourceActions
+	unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActions)
+	if unmarshallErr != nil {
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
+	}
+
+	for _, resources := range resourceActions.Content {
 		if resources.ResourceTypeRef.ID == utils.DeploymentResourceType {
 			deploymentName := resources.Name
 			var destroyEnabled bool
@@ -472,24 +473,26 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			if !destroyEnabled {
 				return fmt.Errorf("The deployment %v cannot be destroyed, your entitlement has no Destroy Deployment action enabled", deploymentName)
 			}
-			resourceActionTemplate := new(ResourceActionTemplate)
-			apiError := new(APIError)
+
 			getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, destroyActionID)
-			log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.ID)
-			response, err := vRAClient.HTTPClient.New().Get(getActionTemplatePath).
-				Receive(resourceActionTemplate, apiError)
-			response.Close = true
-			if !apiError.isEmpty() {
-				log.Errorf(utils.DestroyActionTemplateError, deploymentName, apiError.Error())
-				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, apiError.Error())
-			}
-			if err != nil {
-				log.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
-				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
+
+			url := client.BuildEncodedURL(getActionTemplatePath, nil)
+			respBody, respErr := client.Get(url, nil)
+			if respErr != nil {
+				log.Errorf(utils.DestroyActionTemplateError, deploymentName, respErr.Error())
+				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, respErr.Error())
 			}
 
+			var resourceActionTemplate ResourceActionTemplate
+			unmarshallErr := utils.UnmarshalJSON(respBody, &resourceActionTemplate)
+			if unmarshallErr != nil {
+				log.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
+				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
+			}
+			log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.ID)
+
 			postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, destroyActionID)
-			err = vRAClient.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
+			err := DestroyMachine(resourceActionTemplate, postActionTemplatePath)
 			if err != nil {
 				return err
 			}
@@ -501,7 +504,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor) * time.Second)
 		log.Info("Checking to see if resource is deleted.")
-		deploymentStateData, err := vRAClient.GetDeploymentState(catalogItemRequestID)
+		deploymentStateData, err := GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
 		}
@@ -525,103 +528,98 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 }
 
 //DestroyMachine - To set resource destroy call
-func (vRAClient *APIClient) DestroyMachine(destroyTemplate *ResourceActionTemplate, destroyActionURL string) error {
-	apiError := new(APIError)
-	resp, err := vRAClient.HTTPClient.New().Post(destroyActionURL).
-		BodyJSON(destroyTemplate).Receive(nil, apiError)
+func DestroyMachine(destroyTemplate ResourceActionTemplate, destroyActionURL string) error {
 
-	if resp.StatusCode != 201 {
-		log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
-		return err
-	}
-
-	if !apiError.isEmpty() {
-		log.Errorf("The destroy deployment request failed with error: %v ", apiError.Errors)
-		return apiError
+	//TODO: fix this
+	// if resp.StatusCode != 201 {
+	// 	log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
+	// 	return err
+	// }
+	buffer, _ := utils.MarshalToJSON(destroyTemplate)
+	url := client.BuildEncodedURL(destroyActionURL, nil)
+	_, respErr := client.Post(url, buffer, nil)
+	if respErr != nil {
+		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
+		return respErr
 	}
 	return nil
 }
 
 //GetRequestStatus - To read request status of resource
 // which is used to show information to user post create call.
-func (vRAClient *APIClient) GetRequestStatus(requestID string) (*RequestStatusView, error) {
+func GetRequestStatus(requestID string) (*RequestStatusView, error) {
 	//Form a URL to read request status
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", requestID)
-	RequestStatusViewTemplate := new(RequestStatusView)
-	apiError := new(APIError)
-	//Set a REST call and fetch a resource request status
-	_, err := vRAClient.HTTPClient.New().Get(path).Receive(RequestStatusViewTemplate, apiError)
-	if err != nil {
-		return nil, err
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return nil, respErr
 	}
-	if !apiError.isEmpty() {
-		return nil, apiError
+
+	var response RequestStatusView
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
+		return nil, unmarshallErr
 	}
-	return RequestStatusViewTemplate, nil
+	return &response, nil
 }
 
 // GetDeploymentState - Read the state of a vRA7 Deployment
-func (vRAClient *APIClient) GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
+func GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
 	//Form an URL to fetch resource list view
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s"+
 		"/resourceViews", CatalogRequestID)
-	ResourceView := new(ResourceView)
-	apiError := new(APIError)
-	//Set a REST call to fetch resource view data
-	_, err := vRAClient.HTTPClient.New().Get(path).Receive(ResourceView, apiError)
-	if err != nil {
-		return nil, err
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return nil, respErr
 	}
-	if !apiError.isEmpty() {
-		return nil, apiError
+
+	var response ResourceView
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
+		return nil, unmarshallErr
 	}
-	return ResourceView, nil
+	return &response, nil
 }
 
 // GetRequestResourceView retrieves the resources that were provisioned as a result of a given request.
-func (vRAClient *APIClient) GetRequestResourceView(catalogRequestID string) (*RequestResourceView, error) {
+func GetRequestResourceView(catalogRequestID string) (*RequestResourceView, error) {
 	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, catalogRequestID)
-	requestResourceView := new(RequestResourceView)
-	apiError := new(APIError)
-	_, err := vRAClient.HTTPClient.New().Get(path).Receive(requestResourceView, apiError)
-	if err != nil {
-		return nil, err
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return nil, respErr
 	}
-	if !apiError.isEmpty() {
-		return nil, apiError
+
+	var response RequestResourceView
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
+		return nil, unmarshallErr
 	}
-	return requestResourceView, nil
+	return &response, nil
 }
 
 //RequestCatalogItem - Make a catalog request.
-func (vRAClient *APIClient) RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
+func RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
 		"/requests", requestTemplate.CatalogItemID)
 
-	catalogRequest := new(CatalogRequest)
-	apiError := new(APIError)
-
-	jsonBody, jErr := json.Marshal(requestTemplate)
-	if jErr != nil {
-		log.Error("Error marshalling request templat as JSON")
-		return nil, jErr
+	buffer, _ := utils.MarshalToJSON(requestTemplate)
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Post(url, buffer, nil)
+	if respErr != nil {
+		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
+		return nil, respErr
 	}
 
-	log.Info("JSON Request Info: %s", string(jsonBody))
-	//Set a REST call to create a machine
-	_, err := vRAClient.HTTPClient.New().Post(path).BodyJSON(requestTemplate).
-		Receive(catalogRequest, apiError)
-
-	if err != nil {
-		return nil, err
+	var response CatalogRequest
+	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
+	if unmarshallErr != nil {
+		return nil, unmarshallErr
 	}
-
-	if !apiError.isEmpty() {
-		return nil, apiError
-	}
-
-	return catalogRequest, nil
+	return &response, nil
 }
 
 // check if the resource configuration is valid in the terraform config file
@@ -668,7 +666,7 @@ func checkResourceConfigValidity(requestTemplate *CatalogItemRequestTemplate) er
 
 // check if the values provided in the config file are valid and set
 // them in the resource schema. Requires to call APIs
-func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*CatalogItemRequestTemplate, error) {
+func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTemplate, error) {
 	// 	// If catalog_name and catalog_id both not provided then return an error
 	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
 		return nil, fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
@@ -679,7 +677,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 	var err error
 	// if catalog item id is provided, fetch the catalog item name
 	if len(catalogItemName) > 0 {
-		catalogItemIDFromName, err = vRAClient.readCatalogItemIDByName(catalogItemName)
+		catalogItemIDFromName, err = ReadCatalogItemByName(catalogItemName)
 		if err != nil || catalogItemIDFromName == "" {
 			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", catalogItemName, err)
 		}
@@ -688,7 +686,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 
 	// if catalog item name is provided, fetch the catalog item id
 	if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		catalogItemNameFromID, err = vRAClient.readCatalogItemNameByID(catalogItemID)
+		catalogItemNameFromID, err = ReadCatalogItemNameByID(catalogItemID)
 		if err != nil || catalogItemNameFromID == "" {
 			return nil, fmt.Errorf("Error in finding catalog item name corresponding to the catlog item id %v: \n %v", catalogItemID, err)
 		}
@@ -711,7 +709,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 	catalogItemID = d.Get(utils.CatalogID).(string)
 
 	// Get request template for catalog item.
-	requestTemplate, err := vRAClient.GetCatalogItemRequestTemplate(catalogItemID)
+	requestTemplate, err := GetCatalogItemRequestTemplate(catalogItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -724,7 +722,7 @@ func checkConfigValuesValidity(vRAClient *APIClient, d *schema.ResourceData) (*C
 	// get the business group id from name
 	var businessGroupIDFromName string
 	if len(businessGroupName) > 0 {
-		businessGroupIDFromName, err = vRAClient.GetBusinessGroupID(businessGroupName)
+		businessGroupIDFromName, err = GetBusinessGroupID(businessGroupName, "qe")
 		if err != nil || businessGroupIDFromName == "" {
 			return nil, err
 		}
@@ -780,23 +778,26 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 }
 
 // GetBusinessGroupID retrieves business group id from business group name
-func (vRAClient *APIClient) GetBusinessGroupID(businessGroupName string) (string, error) {
+func GetBusinessGroupID(businessGroupName string, tenant string) (string, error) {
 
-	path := "/identity/api/tenants/" + vRAClient.Tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
+	path := "/identity/api/tenants/" + tenant + "/subtenants?%24filter=name+eq+'" + businessGroupName + "'"
 	log.Info("Fetching business group id from name..GET %s ", path)
-	BusinessGroups := new(BusinessGroups)
-	apiError := new(APIError)
-	_, err := vRAClient.HTTPClient.New().Get(path).Receive(BusinessGroups, apiError)
-	if err != nil {
-		return "", err
+
+	url := client.BuildEncodedURL(path, nil)
+	respBody, respErr := client.Get(url, nil)
+	if respErr != nil {
+		return "", respErr
 	}
-	if !apiError.isEmpty() {
-		return "", apiError
+
+	var businessGroup BusinessGroups
+	unmarshallErr := utils.UnmarshalJSON(respBody, &businessGroup)
+	if unmarshallErr != nil {
+		return "", unmarshallErr
 	}
 	// BusinessGroups array will contain only one BusinessGroup element containing the BG
 	// with the name businessGroupName.
 	// Fetch the id of that BG
-	return BusinessGroups.Content[0].ID, nil
+	return businessGroup.Content[0].ID, nil
 }
 
 // read the config file
