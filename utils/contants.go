@@ -55,13 +55,19 @@ const (
 	CatalogItemIDNameNotMatchingErr   = "The catalog item name %s and id %s does not belong to the same catalog item, provide either name or id"
 	// api constants
 
-	CatalogService            = "/catalog-service"
-	CatalogServiceAPI         = CatalogService + "/api"
-	Consumer                  = CatalogServiceAPI + "/consumer"
-	ConsumerRequests          = Consumer + "/requests"
-	ConsumerResources         = Consumer + "/resources"
-	GetResourceAPI            = ConsumerRequests + "/" + "%s" + "/resources"
-	PostActionTemplateAPI     = ConsumerResources + "/" + "%s" + "/actions/" + "%s" + "/requests"
-	GetActionTemplateAPI      = PostActionTemplateAPI + "/template"
-	GetRequestResourceViewAPI = ConsumerRequests + "/" + "%s" + "/resourceViews"
+	CatalogService              = "/catalog-service"
+	CatalogServiceAPI           = CatalogService + "/api"
+	Consumer                    = CatalogServiceAPI + "/consumer"
+	ConsumerRequests            = Consumer + "/requests"
+	ConsumerResources           = Consumer + "/resources"
+	EntitledCatalogItems        = Consumer + "/entitledCatalogItems"
+	EntitledCatalogItemViewsAPI = Consumer + "/entitledCatalogItemViews"
+	GetResourceAPI              = ConsumerRequests + "/" + "%s" + "/resources"
+	PostActionTemplateAPI       = ConsumerResources + "/" + "%s" + "/actions/" + "%s" + "/requests"
+	GetActionTemplateAPI        = PostActionTemplateAPI + "/template"
+	GetRequestResourceViewAPI   = ConsumerRequests + "/" + "%s" + "/resourceViews"
+	RequestTemplateAPI          = EntitledCatalogItems + "/" + "%s" + "/requests/template"
+
+	IdentityAPI = "/identity/api"
+	Tenants     = IdentityAPI + "/tenants"
 )

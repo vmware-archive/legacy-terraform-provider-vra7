@@ -221,8 +221,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						}
 						// If template value got changed then set post call and update resource child
 						if configChanged != false {
-							postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, reconfigureActionID)
-							err := sdk.PostResourceConfig(postActionTemplatePath, resourceActionTemplate)
+							err := sdk.PostResourceAction(resources.ID, reconfigureActionID, resourceActionTemplate)
 							if err != nil {
 								oldData, _ := d.GetChange(utils.ResourceConfiguration)
 								d.Set(utils.ResourceConfiguration, oldData)
@@ -342,8 +341,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 				log.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
 				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
 			}
-			postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, destroyActionID)
-			err = sdk.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
+			err = sdk.PostResourceAction(resources.ID, destroyActionID, resourceActionTemplate)
 			if err != nil {
 				log.Errorf("The destroy deployment request failed with error: %v ", err)
 				return err
