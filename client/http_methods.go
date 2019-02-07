@@ -4,27 +4,6 @@ import (
 	"io"
 )
 
-const (
-	// Common header key
-	ContentTypeHeader   = "Content-Type"
-	ContentLengthHeader = "Content-Length"
-	AuthorizationHeader = "Authorization"
-	ConnectionHeader    = "Connection"
-	AcceptHeader        = "Accept"
-
-	// Common header values
-	AppJson         = "application/json"
-	AppYaml         = "application/yaml"
-	CloseConnection = "close"
-
-	// Http Methods
-	GET    = "GET"
-	POST   = "POST"
-	PATCH  = "PATCH"
-	PUT    = "PUT"
-	DELETE = "DELETE"
-)
-
 func Get(encodedUrl string, headers map[string]string) (*APIResponse, error) {
 	req := &APIRequest{
 		Method:  GET,

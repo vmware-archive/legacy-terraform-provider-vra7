@@ -1,13 +1,12 @@
 package client
 
 import (
-	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
-	"github.com/hashicorp/terraform/helper/schema"
 	logging "github.com/op/go-logging"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
@@ -15,6 +14,25 @@ import (
 var (
 	log       = logging.MustGetLogger(utils.LoggerID)
 	apiClient APIClient
+)
+
+const (
+	// Common header key
+	ContentTypeHeader   = "Content-Type"
+	AuthorizationHeader = "Authorization"
+	ConnectionHeader    = "Connection"
+	AcceptHeader        = "Accept"
+
+	// Common header values
+	AppJSON         = "application/json"
+	CloseConnection = "close"
+
+	// Http Methods
+	GET    = "GET"
+	POST   = "POST"
+	PATCH  = "PATCH"
+	PUT    = "PUT"
+	DELETE = "DELETE"
 )
 
 type APIClient struct {
@@ -27,32 +45,41 @@ type APIClient struct {
 	Client      *http.Client
 }
 
-func NewClient(d *schema.ResourceData) APIClient {
-
-	transport := http.DefaultTransport.(*http.Transport)
-	transport.TLSClientConfig = &tls.Config{
-		InsecureSkipVerify: d.Get("insecure").(bool),
+func (ar *APIRequest) AddHeader(key, val string) {
+	if ar.Headers == nil {
+		ar.Headers = make(map[string]string)
 	}
-
-	httpClient := &http.Client{
-		// Timeout:   clientTimeout,
-		Transport: transport,
-	}
-
-	apiClient = APIClient{
-		Username: d.Get("username").(string),
-		Password: d.Get("password").(string),
-		Tenant:   d.Get("tenant").(string),
-		BaseURL:  d.Get("host").(string),
-		Insecure: d.Get("insecure").(bool),
-		Client:   httpClient,
-	}
-	return apiClient
+	ar.Headers[key] = val
 }
 
-// Reads an error out of the HTTP response, or does nothing if
+func (ar *APIRequest) ContentType() string {
+	if ar.Headers == nil {
+		return ""
+	}
+
+	contentType, ok := ar.Headers[ContentTypeHeader]
+	if !ok {
+		return ""
+	}
+	return contentType
+}
+
+// CopyHeadersTo Add headers to request object
+func (ar *APIRequest) CopyHeadersTo(req *http.Request) {
+	for key, val := range ar.Headers {
+		req.Header.Add(key, val)
+	}
+}
+
+// Error Implement Go error interface for ApiError
+func (e APIError) Error() string {
+	return fmt.Sprintf("Error: { HTTP status: '%v', message: '%v'}",
+		e.HttpStatusCode, e.Message)
+}
+
+// GetAPIError reads an error out of the HTTP response, or does nothing if
 // no error occured.
-func GetApiError(respBody []byte, statusCode int) error {
+func GetAPIError(respBody []byte, statusCode int) error {
 	apiError := APIError{}
 	unmarshalErr := json.Unmarshal(respBody, &apiError)
 	if unmarshalErr != nil {
@@ -65,26 +92,28 @@ func GetApiError(respBody []byte, statusCode int) error {
 	return apiError
 }
 
-func FromApiRequestToHttpRequest(apiReq *APIRequest) (*http.Request, error) {
+// FromAPIRequestToHTTPRequest converts API request object to http request
+func FromAPIRequestToHTTPRequest(apiReq *APIRequest) (*http.Request, error) {
 	req, err := http.NewRequest(apiReq.Method, apiReq.URL, apiReq.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	if apiReq.ContentType() == "" {
-		apiReq.AddHeader(ContentTypeHeader, AppJson)
+		apiReq.AddHeader(ContentTypeHeader, AppJSON)
 	}
 	apiReq.CopyHeadersTo(req)
 	return req, nil
 }
 
-func FromHttpRespToApiResp(resp *http.Response) (*APIResponse, error) {
+// FromHTTPRespToAPIResp converts Http response to API response
+func FromHTTPRespToAPIResp(resp *http.Response) (*APIResponse, error) {
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode/100 != 2 {
-		return nil, GetApiError(respBody, resp.StatusCode)
+		return nil, GetAPIError(respBody, resp.StatusCode)
 	}
 
 	apiResp := &APIResponse{}
@@ -95,6 +124,7 @@ func FromHttpRespToApiResp(resp *http.Response) (*APIResponse, error) {
 	return apiResp, nil
 }
 
+// BuildEncodedURL build the url by adding the base url and headers, etc
 func BuildEncodedURL(relativePath string, queryParameters map[string]string) string {
 	//Todo it might be better to swith to Viper to load all the config at once
 	serverURL := apiClient.BaseURL

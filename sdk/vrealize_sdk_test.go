@@ -1,4 +1,4 @@
-package vrealize
+package sdk
 
 // import (
 // 	"errors"

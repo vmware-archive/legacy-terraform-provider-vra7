@@ -2,83 +2,45 @@ package client
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
+
+	"github.com/hashicorp/terraform/helper/schema"
 )
 
-const (
-	BearerTokenPrefix = "Bearer "
-)
+// NewClient creates a new APIClient object
+func NewClient(d *schema.ResourceData) APIClient {
 
-type APIResponse struct {
-	Headers    http.Header
-	Body       []byte
-	Status     string
-	StatusCode int
-}
-
-type APIRequest struct {
-	Method  string
-	URL     string
-	Headers map[string]string
-	Body    io.Reader
-}
-
-//AuthResponse - This struct contains response of user authentication call.
-type AuthResponse struct {
-	Expires time.Time `json:"expires"`
-	ID      string    `json:"id"`
-	Tenant  string    `json:"tenant"`
-}
-
-type AuthenticationRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Tenant   string `json:"tenant"`
-}
-
-func (ar *APIRequest) AddHeader(key, val string) {
-	if ar.Headers == nil {
-		ar.Headers = make(map[string]string)
-	}
-	ar.Headers[key] = val
-}
-
-func (ar *APIRequest) ContentType() string {
-	if ar.Headers == nil {
-		return ""
+	transport := http.DefaultTransport.(*http.Transport)
+	transport.TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: d.Get("insecure").(bool),
 	}
 
-	contentType, ok := ar.Headers[ContentTypeHeader]
-	if !ok {
-		return ""
+	httpClient := &http.Client{
+		// Timeout:   clientTimeout,
+		Transport: transport,
 	}
-	return contentType
-}
 
-func (ar *APIRequest) CopyHeadersTo(req *http.Request) {
-	for key, val := range ar.Headers {
-		req.Header.Add(key, val)
+	apiClient = APIClient{
+		Username: d.Get("username").(string),
+		Password: d.Get("password").(string),
+		Tenant:   d.Get("tenant").(string),
+		BaseURL:  d.Get("host").(string),
+		Insecure: d.Get("insecure").(bool),
+		Client:   httpClient,
 	}
+	return apiClient
 }
 
-// Represents an error from the Photon API.
-type APIError struct {
-	Message        string `json:"message"`
-	HttpStatusCode int    `json:"-"` // Not part of API contract
-}
-
-// Implement Go error interface for ApiError
-func (e APIError) Error() string {
-	return fmt.Sprintf("Error: { HTTP status: '%v', message: '%v'}",
-		e.HttpStatusCode, e.Message)
-}
-
+// DoRequest makes the request and returns the response
 func DoRequest(req *APIRequest, login bool) (*APIResponse, error) {
-	r, err := FromApiRequestToHttpRequest(req)
+	r, err := FromAPIRequestToHTTPRequest(req)
+
+	if err != nil {
+		return nil, err
+	}
 
 	if !login {
 		err = addToken(r)
@@ -95,7 +57,7 @@ func DoRequest(req *APIRequest, login bool) (*APIResponse, error) {
 		return nil, err
 	}
 	log.Info("Check the status of the request %s \n The response is: %s", req.URL, string(resp.Status))
-	return FromHttpRespToApiResp(resp)
+	return FromHTTPRespToAPIResp(resp)
 }
 
 func addToken(req *http.Request) error {
@@ -110,10 +72,11 @@ func addToken(req *http.Request) error {
 		return err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Add(AuthorizationHeader, fmt.Sprintf("Bearer %s", token))
 	return nil
 }
 
+// Authenticate authenticates for the first time when the provider is invoked
 func (apiClient *APIClient) Authenticate() (string, error) {
 	uri := fmt.Sprintf("%s/identity/api/tokens", apiClient.BaseURL)
 	data := AuthenticationRequest{
@@ -129,21 +92,18 @@ func (apiClient *APIClient) Authenticate() (string, error) {
 		Body:   bytes.NewBufferString(string(jsonData)),
 		URL:    uri,
 	}
-	req.AddHeader(AcceptHeader, AppJson)
-	req.AddHeader(ContentTypeHeader, AppJson)
+	req.AddHeader(AcceptHeader, AppJSON)
+	req.AddHeader(ContentTypeHeader, AppJSON)
 
 	return DoLogin(req)
 }
 
+// DoLogin returns the bearer token
 func DoLogin(apiReq *APIRequest) (string, error) {
 	apiResp, err := DoRequest(apiReq, true)
 	if err != nil {
 		return "", err
 	}
-
-	//The response body of login request using access key and refresh token are different
-	//Handle both of these two scenarios
-	//This is for the response from access key login
 	response := &AuthResponse{}
 
 	err = json.Unmarshal(apiResp.Body, response)

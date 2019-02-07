@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform/helper/schema"
 	logging "github.com/op/go-logging"
-	"github.com/vmware/terraform-provider-vra7/client"
+	"github.com/vmware/terraform-provider-vra7/sdk"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
@@ -39,45 +38,6 @@ func (s byLength) Len() int {
 }
 func (s byLength) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
-}
-
-//Replace the value for a given key in a catalog request template.
-func replaceValueInRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
-	var replaced bool
-	//Iterate over the map to get field provided as an argument
-	for key := range templateInterface {
-		//If value type is map then set recursive call which will fiend field in one level down of map interface
-		if reflect.ValueOf(templateInterface[key]).Kind() == reflect.Map {
-			template, _ := templateInterface[key].(map[string]interface{})
-			templateInterface[key], replaced = replaceValueInRequestTemplate(template, field, value)
-			if replaced == true {
-				return templateInterface, true
-			}
-		} else if key == field {
-			//If value type is not map then compare field name with provided field name
-			//If both matches then update field value with provided value
-			templateInterface[key] = value
-			return templateInterface, true
-		}
-	}
-	//Return updated map interface type
-	return templateInterface, replaced
-}
-
-//modeled after replaceValueInRequestTemplate, for values being added to template vs updating existing ones
-func addValueToRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
-	//simplest case is adding a simple value. Leaving as a func in case there's a need to do more complicated additions later
-	//	templateInterface[data]
-	for k, v := range templateInterface {
-		if reflect.ValueOf(v).Kind() == reflect.Map && k == "data" {
-			template, _ := v.(map[string]interface{})
-			v = addValueToRequestTemplate(template, field, value)
-		} else { //if i == "data" {
-			templateInterface[field] = value
-		}
-	}
-	//Return updated map interface type
-	return templateInterface
 }
 
 // Terraform call - terraform apply
@@ -155,7 +115,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	log.Info("Updated template - %v\n", requestTemplate.Data)
 
 	//Fire off a catalog item request to create a deployment.
-	catalogRequest, err := RequestCatalogItem(requestTemplate)
+	catalogRequest, err := sdk.RequestCatalogItem(requestTemplate)
 
 	if err != nil {
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
@@ -169,10 +129,10 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	var replaced bool
-	templateInterface, replaced = replaceValueInRequestTemplate(templateInterface, field, value)
+	templateInterface, replaced = utils.ReplaceValueInRequestTemplate(templateInterface, field, value)
 
 	if !replaced {
-		templateInterface["data"] = addValueToRequestTemplate(templateInterface["data"].(map[string]interface{}), field, value)
+		templateInterface["data"] = utils.AddValueToRequestTemplate(templateInterface["data"].(map[string]interface{}), field, value)
 	}
 	return templateInterface
 }
@@ -196,20 +156,9 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		return validityErr
 	}
 
-	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
-
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, respErr.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, respErr.Error())
-	}
-
-	var resourceActions ResourceActions
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActions)
-	if unmarshallErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
+	resourceActions, err := sdk.GetResourceActions(catalogItemRequestID)
+	if err != nil {
+		return err
 	}
 
 	// If any change made in resource_configuration.
@@ -242,20 +191,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 							}
 						}
 						log.Info("Retrieving reconfigure action template for the component: %v ", componentName)
-						getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, reconfigureActionID)
-						log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
-						url = client.BuildEncodedURL(getActionTemplatePath, nil)
-						respBody, respErr := client.Get(url, nil)
-						if respErr != nil {
-							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, respErr.Error())
-							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, respErr.Error())
-						}
 
-						var resourceActionTemplate ResourceActionTemplate
-						unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActionTemplate)
-						if unmarshallErr != nil {
-							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
-							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, unmarshallErr.Error())
+						resourceActionTemplate, err := sdk.GetResourceActionTemplate(resources.ID, reconfigureActionID)
+						if err != nil {
+							log.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
+							return fmt.Errorf("Error retrieving reconfigure action template for the component %v: %v ", componentName, err.Error())
 						}
 						configChanged := false
 						returnFlag := false
@@ -268,7 +208,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 								//actionResponseInterface := actionResponse.(map[string]interface{})
 								//Function call which changes the template field values with  user values
 								//Replace existing values with new values in resource child template
-								resourceActionTemplate.Data, returnFlag = replaceValueInRequestTemplate(
+								resourceActionTemplate.Data, returnFlag = utils.ReplaceValueInRequestTemplate(
 									resourceActionTemplate.Data,
 									nameList[1],
 									resourceConfiguration[configKey])
@@ -280,8 +220,11 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 						// If template value got changed then set post call and update resource child
 						if configChanged != false {
 							postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, reconfigureActionID)
-							err := postResourceConfig(d, postActionTemplatePath, resourceActionTemplate)
+							err := sdk.PostResourceConfig(postActionTemplatePath, resourceActionTemplate)
 							if err != nil {
+								oldData, _ := d.GetChange(utils.ResourceConfiguration)
+								d.Set(utils.ResourceConfiguration, oldData)
+								log.Errorf("The destroy deployment request failed with error: %v ", err)
 								return err
 							}
 						}
@@ -291,34 +234,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 	return waitForRequestCompletion(d, meta)
-}
-
-func postResourceConfig(d *schema.ResourceData, reconfigPostLink string, resourceActionTemplate ResourceActionTemplate) error {
-
-	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
-	url := client.BuildEncodedURL(reconfigPostLink, nil)
-	respBody, respErr := client.Post(url, buffer, nil)
-	if respErr != nil {
-		oldData, _ := d.GetChange(utils.ResourceConfiguration)
-		d.Set(utils.ResourceConfiguration, oldData)
-		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
-		return respErr
-	}
-
-	if respBody.StatusCode != 201 {
-		oldData, _ := d.GetChange(utils.ResourceConfiguration)
-		d.Set(utils.ResourceConfiguration, oldData)
-		return respErr
-	}
-
-	var response ResourceActionTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		oldData, _ := d.GetChange(utils.ResourceConfiguration)
-		d.Set(utils.ResourceConfiguration, oldData)
-		return unmarshallErr
-	}
-	return nil
 }
 
 // Terraform call - terraform refresh
@@ -331,7 +246,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	log.Info("Calling read resource to get the current resource status of the request: %v ", catalogItemRequestID)
 	// Get client handle
 	// Get requested status
-	resourceTemplate, errTemplate := GetRequestStatus(catalogItemRequestID)
+	resourceTemplate, errTemplate := sdk.GetRequestStatus(catalogItemRequestID)
 
 	if errTemplate != nil {
 		log.Errorf("Resource view failed to load:  %v", errTemplate)
@@ -346,7 +261,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		d.Set(utils.FailedMessage, resourceTemplate.RequestCompletion.CompletionDetails)
 	}
 
-	requestResourceView, errTemplate := GetRequestResourceView(catalogItemRequestID)
+	requestResourceView, errTemplate := sdk.GetRequestResourceView(catalogItemRequestID)
 	if errTemplate != nil {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
@@ -376,7 +291,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	resourceConfiguration, _ := d.Get(utils.ResourceConfiguration).(map[string]interface{})
 	changed := false
 
-	resourceConfiguration, changed = updateResourceConfigurationMap(resourceConfiguration, resourceDataMap)
+	resourceConfiguration, changed = utils.UpdateResourceConfigurationMap(resourceConfiguration, resourceDataMap)
 
 	if changed {
 		setError := d.Set(utils.ResourceConfiguration, resourceConfiguration)
@@ -385,47 +300,6 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 	return nil
-}
-
-// update the resource configuration with the deployment resource data.
-// if there is difference between the config data and deployment data, return true
-func updateResourceConfigurationMap(
-	resourceConfiguration map[string]interface{}, vmData map[string]map[string]interface{}) (map[string]interface{}, bool) {
-	log.Info("Updating resource configuration with the request resource view data...")
-	var changed bool
-	for configKey1, configValue1 := range resourceConfiguration {
-		for configKey2, configValue2 := range vmData {
-			if strings.HasPrefix(configKey1, configKey2+".") {
-				trimmedKey := strings.TrimPrefix(configKey1, configKey2+".")
-				currentValue := configValue1
-				updatedValue := convertInterfaceToString(configValue2[trimmedKey])
-
-				if updatedValue != "" && updatedValue != currentValue {
-					resourceConfiguration[configKey1] = updatedValue
-					changed = true
-				}
-			}
-		}
-	}
-	return resourceConfiguration, changed
-}
-
-func convertInterfaceToString(interfaceData interface{}) string {
-	var stringData string
-	if reflect.ValueOf(interfaceData).Kind() == reflect.Float64 {
-		stringData =
-			strconv.FormatFloat(interfaceData.(float64), 'f', 0, 64)
-	} else if reflect.ValueOf(interfaceData).Kind() == reflect.Float32 {
-		stringData =
-			strconv.FormatFloat(interfaceData.(float64), 'f', 0, 32)
-	} else if reflect.ValueOf(interfaceData).Kind() == reflect.Int {
-		stringData = strconv.Itoa(interfaceData.(int))
-	} else if reflect.ValueOf(interfaceData).Kind() == reflect.String {
-		stringData = interfaceData.(string)
-	} else if reflect.ValueOf(interfaceData).Kind() == reflect.Bool {
-		stringData = strconv.FormatBool(interfaceData.(bool))
-	}
-	return stringData
 }
 
 //Function use - To delete resources which are created by terraform and present in state file
@@ -439,20 +313,9 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
 
-	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
-
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, respErr.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, respErr.Error())
-	}
-
-	var resourceActions ResourceActions
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActions)
-	if unmarshallErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
-		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
+	resourceActions, err := sdk.GetResourceActions(catalogItemRequestID)
+	if err != nil {
+		return err
 	}
 
 	for _, resources := range resourceActions.Content {
@@ -472,26 +335,13 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			if !destroyEnabled {
 				return fmt.Errorf("The deployment %v cannot be destroyed, your entitlement has no Destroy Deployment action enabled", deploymentName)
 			}
-
-			getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resources.ID, destroyActionID)
-
-			url := client.BuildEncodedURL(getActionTemplatePath, nil)
-			respBody, respErr := client.Get(url, nil)
-			if respErr != nil {
-				log.Errorf(utils.DestroyActionTemplateError, deploymentName, respErr.Error())
-				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, respErr.Error())
+			resourceActionTemplate, err := sdk.GetResourceActionTemplate(resources.ID, destroyActionID)
+			if err != nil {
+				log.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
+				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, err.Error())
 			}
-
-			var resourceActionTemplate ResourceActionTemplate
-			unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActionTemplate)
-			if unmarshallErr != nil {
-				log.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
-				return fmt.Errorf(utils.DestroyActionTemplateError, deploymentName, unmarshallErr.Error())
-			}
-			log.Info("GET %v to fetch the destroy action template for the resource %v ", getActionTemplatePath, resources.ID)
-
 			postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, destroyActionID)
-			err := DestroyMachine(resourceActionTemplate, postActionTemplatePath)
+			err = sdk.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
 			if err != nil {
 				return err
 			}
@@ -503,7 +353,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor) * time.Second)
 		log.Info("Checking to see if resource is deleted.")
-		deploymentStateData, err := GetDeploymentState(catalogItemRequestID)
+		deploymentStateData, err := sdk.GetDeploymentState(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
 		}
@@ -526,102 +376,8 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	return nil
 }
 
-//DestroyMachine - To set resource destroy call
-func DestroyMachine(destroyTemplate ResourceActionTemplate, destroyActionURL string) error {
-
-	buffer, _ := utils.MarshalToJSON(destroyTemplate)
-	url := client.BuildEncodedURL(destroyActionURL, nil)
-	resp, respErr := client.Post(url, buffer, nil)
-	if respErr != nil {
-		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
-		return respErr
-	}
-	if resp.StatusCode != 201 {
-		log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
-		return respErr
-	}
-	return nil
-}
-
-//GetRequestStatus - To read request status of resource
-// which is used to show information to user post create call.
-func GetRequestStatus(requestID string) (*RequestStatusView, error) {
-	//Form a URL to read request status
-	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", requestID)
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
-		return nil, respErr
-	}
-
-	var response RequestStatusView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		return nil, unmarshallErr
-	}
-	return &response, nil
-}
-
-// GetDeploymentState - Read the state of a vRA7 Deployment
-func GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
-	//Form an URL to fetch resource list view
-	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s"+
-		"/resourceViews", CatalogRequestID)
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
-		return nil, respErr
-	}
-
-	var response ResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		return nil, unmarshallErr
-	}
-	return &response, nil
-}
-
-// GetRequestResourceView retrieves the resources that were provisioned as a result of a given request.
-func GetRequestResourceView(catalogRequestID string) (*RequestResourceView, error) {
-	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, catalogRequestID)
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
-		return nil, respErr
-	}
-
-	var response RequestResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		return nil, unmarshallErr
-	}
-	return &response, nil
-}
-
-//RequestCatalogItem - Make a catalog request.
-func RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
-	//Form a path to set a REST call to create a machine
-	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
-		"/requests", requestTemplate.CatalogItemID)
-
-	buffer, _ := utils.MarshalToJSON(requestTemplate)
-	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Post(url, buffer, nil)
-	if respErr != nil {
-		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
-		return nil, respErr
-	}
-
-	var response CatalogRequest
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		return nil, unmarshallErr
-	}
-	return &response, nil
-}
-
 // check if the resource configuration is valid in the terraform config file
-func checkResourceConfigValidity(requestTemplate *CatalogItemRequestTemplate) error {
+func checkResourceConfigValidity(requestTemplate *sdk.CatalogItemRequestTemplate) error {
 	log.Info("Checking if the terraform config file is valid")
 
 	// Get all component names in the blueprint corresponding to the catalog item.
@@ -664,7 +420,7 @@ func checkResourceConfigValidity(requestTemplate *CatalogItemRequestTemplate) er
 
 // check if the values provided in the config file are valid and set
 // them in the resource schema. Requires to call APIs
-func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTemplate, error) {
+func checkConfigValuesValidity(d *schema.ResourceData) (*sdk.CatalogItemRequestTemplate, error) {
 	// 	// If catalog_name and catalog_id both not provided then return an error
 	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
 		return nil, fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")
@@ -675,7 +431,7 @@ func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTempl
 	var err error
 	// if catalog item id is provided, fetch the catalog item name
 	if len(catalogItemName) > 0 {
-		catalogItemIDFromName, err = ReadCatalogItemByName(catalogItemName)
+		catalogItemIDFromName, err = sdk.ReadCatalogItemByName(catalogItemName)
 		if err != nil || catalogItemIDFromName == "" {
 			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", catalogItemName, err)
 		}
@@ -684,7 +440,7 @@ func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTempl
 
 	// if catalog item name is provided, fetch the catalog item id
 	if len(catalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		catalogItemNameFromID, err = ReadCatalogItemNameByID(catalogItemID)
+		catalogItemNameFromID, err = sdk.ReadCatalogItemNameByID(catalogItemID)
 		if err != nil || catalogItemNameFromID == "" {
 			return nil, fmt.Errorf("Error in finding catalog item name corresponding to the catlog item id %v: \n %v", catalogItemID, err)
 		}
@@ -707,7 +463,7 @@ func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTempl
 	catalogItemID = d.Get(utils.CatalogID).(string)
 
 	// Get request template for catalog item.
-	requestTemplate, err := GetCatalogItemRequestTemplate(catalogItemID)
+	requestTemplate, err := sdk.GetCatalogItemRequestTemplate(catalogItemID)
 	if err != nil {
 		return nil, err
 	}
@@ -720,7 +476,7 @@ func checkConfigValuesValidity(d *schema.ResourceData) (*CatalogItemRequestTempl
 	// get the business group id from name
 	var businessGroupIDFromName string
 	if len(businessGroupName) > 0 {
-		businessGroupIDFromName, err = GetBusinessGroupID(businessGroupName, "qe")
+		businessGroupIDFromName, err = sdk.GetBusinessGroupID(businessGroupName, "qe")
 		if err != nil || businessGroupIDFromName == "" {
 			return nil, err
 		}
@@ -773,33 +529,6 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 	// The execution has timed out while still IN PROGRESS.
 	// The user will need to use 'terraform refresh' at a later point to resolve this.
 	return fmt.Errorf("Resource creation has timed out")
-}
-
-// GetBusinessGroupID retrieves business group id from business group name
-func GetBusinessGroupID(businessGroupName string, tenant string) (string, error) {
-
-	path := "/identity/api/tenants/" + tenant + "/subtenants"
-
-	log.Info("Fetching business group id from name..GET %s ", path)
-
-	uri := client.BuildEncodedURL(path+"?$filter=name eq "+businessGroupName, nil)
-	customURL := strings.Replace(uri, "%3F", "?", -1)
-
-	//url := client.BuildEncodedURL(cus, nil)
-	respBody, respErr := client.Get(customURL, nil)
-	if respErr != nil {
-		return "", respErr
-	}
-
-	var businessGroup BusinessGroups
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &businessGroup)
-	if unmarshallErr != nil {
-		return "", unmarshallErr
-	}
-	// BusinessGroups array will contain only one BusinessGroup element containing the BG
-	// with the name businessGroupName.
-	// Fetch the id of that BG
-	return businessGroup.Content[0].ID, nil
 }
 
 // read the config file
