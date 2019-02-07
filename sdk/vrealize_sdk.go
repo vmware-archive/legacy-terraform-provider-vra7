@@ -14,73 +14,40 @@ var (
 	log = logging.MustGetLogger(utils.LoggerID)
 )
 
-//CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
-type CatalogItemRequestTemplate struct {
-	Type            string                 `json:"type"`
-	CatalogItemID   string                 `json:"catalogItemId"`
-	RequestedFor    string                 `json:"requestedFor"`
-	BusinessGroupID string                 `json:"businessGroupId"`
-	Description     string                 `json:"description"`
-	Reasons         string                 `json:"reasons"`
-	Data            map[string]interface{} `json:"data"`
-}
-
-//catalogName - This struct holds catalog name from json response.
-type catalogName struct {
-	Name string `json:"name"`
-	ID   string `json:"catalogItemId"`
-}
-
-//CatalogItem - This struct holds the value of response of catalog item list
-type CatalogItem struct {
-	CatalogItem catalogName `json:"catalogItem"`
-}
-
 //GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
-func GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTemplate, error) {
+func GetCatalogItemRequestTemplate(catalogItemID string) (*utils.CatalogItemRequestTemplate, error) {
 
 	//Form a path to read catalog request template via REST call
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s/requests/template",
 		catalogItemID)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return nil, respErr
 	}
 
-	var requestTemplate CatalogItemRequestTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &requestTemplate)
+	var requestTemplate utils.CatalogItemRequestTemplate
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &requestTemplate)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
 	return &requestTemplate, nil
 }
 
-type EntitledCatalogItemViews struct {
-	Links    interface{} `json:"links"`
-	Content  interface{} `json:"content"`
-	Metadata Metadata    `json:"metadata"`
-}
-
-// Metadata - Metadata  used to store metadata of resource list response
-type Metadata struct {
-	TotalElements int `json:"totalElements"`
-}
-
-// readCatalogItemNameByID - This function returns the catalog item name using catalog item ID
+// ReadCatalogItemNameByID - This function returns the catalog item name using catalog item ID
 func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/"+
 		"%s", catalogItemID)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return "", respErr
 	}
 
-	var response CatalogItem
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
+	var response utils.CatalogItem
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
@@ -119,16 +86,13 @@ func ReadCatalogItemByName(catalogName string) (string, error) {
 	path := fmt.Sprintf("catalog-service/api/consumer/entitledCatalogItemViews")
 
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
-	if respErr != nil {
+	resp, respErr := client.Get(url, nil)
+	if respErr != nil || resp.StatusCode != 200 {
 		return "", respErr
 	}
-	if respBody.StatusCode != 200 {
-		return "", fmt.Errorf("Error with status code %v", respBody.StatusCode)
-	}
 
-	var template EntitledCatalogItemViews
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &template)
+	var template utils.EntitledCatalogItemViews
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &template)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
@@ -159,7 +123,6 @@ func ReadCatalogItemByName(catalogName string) (string, error) {
 			catalogItemNameArray[index] = strconv.Itoa(index+1) + " " + catalogItemNameArray[index]
 		}
 		errorMessage := strings.Join(catalogItemNameArray, "\n")
-		fmt.Println(errorMessage)
 		punctuation := "is"
 		if len(catalogItemNameArray) > 1 {
 			punctuation = "are"
@@ -181,13 +144,13 @@ func GetBusinessGroupID(businessGroupName string, tenant string) (string, error)
 	customURL := strings.Replace(uri, "%3F", "?", -1)
 
 	//url := client.BuildEncodedURL(cus, nil)
-	respBody, respErr := client.Get(customURL, nil)
+	resp, respErr := client.Get(customURL, nil)
 	if respErr != nil {
 		return "", respErr
 	}
 
 	var businessGroup utils.BusinessGroups
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &businessGroup)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &businessGroup)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
@@ -203,12 +166,7 @@ func DestroyMachine(destroyTemplate *utils.ResourceActionTemplate, destroyAction
 	buffer, _ := utils.MarshalToJSON(destroyTemplate)
 	url := client.BuildEncodedURL(destroyActionURL, nil)
 	resp, respErr := client.Post(url, buffer, nil)
-	if respErr != nil {
-		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
-		return respErr
-	}
-	if resp.StatusCode != 201 {
-		log.Errorf("The destroy deployment request failed with error: %v ", resp.Status)
+	if respErr != nil || resp.StatusCode != 201 {
 		return respErr
 	}
 	return nil
@@ -220,13 +178,13 @@ func GetRequestStatus(requestID string) (*utils.RequestStatusView, error) {
 	//Form a URL to read request status
 	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s", requestID)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return nil, respErr
 	}
 
 	var response utils.RequestStatusView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -236,16 +194,15 @@ func GetRequestStatus(requestID string) (*utils.RequestStatusView, error) {
 // GetDeploymentState - Read the state of a vRA7 Deployment
 func GetDeploymentState(CatalogRequestID string) (*utils.ResourceView, error) {
 	//Form an URL to fetch resource list view
-	path := fmt.Sprintf("catalog-service/api/consumer/requests/%s"+
-		"/resourceViews", CatalogRequestID)
+	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, CatalogRequestID)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return nil, respErr
 	}
 
 	var response utils.ResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -256,13 +213,13 @@ func GetDeploymentState(CatalogRequestID string) (*utils.ResourceView, error) {
 func GetRequestResourceView(catalogRequestID string) (*utils.RequestResourceView, error) {
 	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, catalogRequestID)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return nil, respErr
 	}
 
 	var response utils.RequestResourceView
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
@@ -270,80 +227,70 @@ func GetRequestResourceView(catalogRequestID string) (*utils.RequestResourceView
 }
 
 //RequestCatalogItem - Make a catalog request.
-func RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*utils.CatalogRequest, error) {
+func RequestCatalogItem(requestTemplate *utils.CatalogItemRequestTemplate) (*utils.CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf("/catalog-service/api/consumer/entitledCatalogItems/%s"+
 		"/requests", requestTemplate.CatalogItemID)
 
 	buffer, _ := utils.MarshalToJSON(requestTemplate)
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Post(url, buffer, nil)
+	resp, respErr := client.Post(url, buffer, nil)
 	if respErr != nil {
-		log.Errorf("The destroy deployment request failed with error: %v ", respErr)
 		return nil, respErr
 	}
 
 	var response utils.CatalogRequest
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
 	return &response, nil
 }
 
+// GetResourceActions get the resource actions allowed for a resource
 func GetResourceActions(catalogItemRequestID string) (*utils.ResourceActions, error) {
 	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
 
 	url := client.BuildEncodedURL(path, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, respErr.Error())
-		return nil, fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, respErr.Error())
+		return nil, respErr
 	}
 
 	var resourceActions utils.ResourceActions
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActions)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &resourceActions)
 	if unmarshallErr != nil {
-		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, unmarshallErr.Error())
-		return nil, fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, unmarshallErr.Error())
+		return nil, unmarshallErr
 	}
 	return &resourceActions, nil
 }
 
-func GetResourceActionTemplate(resourceID, reconfigureActionID string) (*utils.ResourceActionTemplate, error) {
-	getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resourceID, reconfigureActionID)
+// GetResourceActionTemplate get the action template corresponding to the action id
+func GetResourceActionTemplate(resourceID, actionID string) (*utils.ResourceActionTemplate, error) {
+	getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resourceID, actionID)
 	log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
 	url := client.BuildEncodedURL(getActionTemplatePath, nil)
-	respBody, respErr := client.Get(url, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return nil, respErr
 	}
 
 	var resourceActionTemplate utils.ResourceActionTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &resourceActionTemplate)
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &resourceActionTemplate)
 	if unmarshallErr != nil {
 		return nil, unmarshallErr
 	}
 	return &resourceActionTemplate, nil
 }
 
+// PostResourceConfig updates the resource
 func PostResourceConfig(reconfigPostLink string, resourceActionTemplate *utils.ResourceActionTemplate) error {
 
 	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
 	url := client.BuildEncodedURL(reconfigPostLink, nil)
-	respBody, respErr := client.Post(url, buffer, nil)
-	if respErr != nil {
+	resp, respErr := client.Post(url, buffer, nil)
+	if respErr != nil || resp.StatusCode != 201 {
 		return respErr
-	}
-
-	if respBody.StatusCode != 201 {
-		return respErr
-	}
-
-	var response utils.ResourceActionTemplate
-	unmarshallErr := utils.UnmarshalJSON(respBody.Body, &response)
-	if unmarshallErr != nil {
-		return unmarshallErr
 	}
 	return nil
 }

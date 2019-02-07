@@ -118,6 +118,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	catalogRequest, err := sdk.RequestCatalogItem(requestTemplate)
 
 	if err != nil {
+		log.Errorf("The destroy deployment request failed with error: %v ", err)
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
 	//Set request ID
@@ -158,7 +159,8 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 
 	resourceActions, err := sdk.GetResourceActions(catalogItemRequestID)
 	if err != nil {
-		return err
+		log.Errorf("Error while reading resource actions for the request %v: %v ", catalogItemRequestID, err.Error())
+		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
 
 	// If any change made in resource_configuration.
@@ -224,7 +226,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 							if err != nil {
 								oldData, _ := d.GetChange(utils.ResourceConfiguration)
 								d.Set(utils.ResourceConfiguration, oldData)
-								log.Errorf("The destroy deployment request failed with error: %v ", err)
+								log.Errorf("The update request failed with error: %v ", err)
 								return err
 							}
 						}
@@ -343,6 +345,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resources.ID, destroyActionID)
 			err = sdk.DestroyMachine(resourceActionTemplate, postActionTemplatePath)
 			if err != nil {
+				log.Errorf("The destroy deployment request failed with error: %v ", err)
 				return err
 			}
 		}
@@ -377,7 +380,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 }
 
 // check if the resource configuration is valid in the terraform config file
-func checkResourceConfigValidity(requestTemplate *sdk.CatalogItemRequestTemplate) error {
+func checkResourceConfigValidity(requestTemplate *utils.CatalogItemRequestTemplate) error {
 	log.Info("Checking if the terraform config file is valid")
 
 	// Get all component names in the blueprint corresponding to the catalog item.
@@ -420,7 +423,7 @@ func checkResourceConfigValidity(requestTemplate *sdk.CatalogItemRequestTemplate
 
 // check if the values provided in the config file are valid and set
 // them in the resource schema. Requires to call APIs
-func checkConfigValuesValidity(d *schema.ResourceData) (*sdk.CatalogItemRequestTemplate, error) {
+func checkConfigValuesValidity(d *schema.ResourceData) (*utils.CatalogItemRequestTemplate, error) {
 	// 	// If catalog_name and catalog_id both not provided then return an error
 	if len(catalogItemName) <= 0 && len(catalogItemID) <= 0 {
 		return nil, fmt.Errorf("Either catalog_name or catalog_id should be present in given configuration")

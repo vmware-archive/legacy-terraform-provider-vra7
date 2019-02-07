@@ -191,3 +191,36 @@ type CatalogRequest struct {
 		Label string `json:"label"`
 	} `json:"catalogItemRef"`
 }
+
+//CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
+type CatalogItemRequestTemplate struct {
+	Type            string                 `json:"type"`
+	CatalogItemID   string                 `json:"catalogItemId"`
+	RequestedFor    string                 `json:"requestedFor"`
+	BusinessGroupID string                 `json:"businessGroupId"`
+	Description     string                 `json:"description"`
+	Reasons         string                 `json:"reasons"`
+	Data            map[string]interface{} `json:"data"`
+}
+
+//catalogName - This struct holds catalog name from json response.
+type catalogName struct {
+	Name string `json:"name"`
+	ID   string `json:"catalogItemId"`
+}
+
+//CatalogItem - This struct holds the value of response of catalog item list
+type CatalogItem struct {
+	CatalogItem catalogName `json:"catalogItem"`
+}
+
+type EntitledCatalogItemViews struct {
+	Links    interface{} `json:"links"`
+	Content  interface{} `json:"content"`
+	Metadata Metadata    `json:"metadata"`
+}
+
+// Metadata - Metadata  used to store metadata of resource list response
+type Metadata struct {
+	TotalElements int `json:"totalElements"`
+}
