@@ -9,6 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/schema"
 	logging "github.com/op/go-logging"
+	"github.com/vmware/terraform-provider-vra7/client"
 	"github.com/vmware/terraform-provider-vra7/sdk"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
@@ -25,6 +26,7 @@ var (
 	deploymentConfiguration map[string]interface{}
 	resourceConfiguration   map[string]interface{}
 	catalogConfiguration    map[string]interface{}
+	vraClient               *client.APIClient
 )
 
 // byLength type to sort component name list by it's name length
@@ -44,6 +46,7 @@ func (s byLength) Swap(i, j int) {
 // This function creates a new vRA 7 Deployment using configuration in a user's Terraform file.
 // The Deployment is produced by invoking a catalog item that is specified in the configuration.
 func createResource(d *schema.ResourceData, meta interface{}) error {
+	vraClient = meta.(*client.APIClient)
 	// Get client handle
 	readProviderConfiguration(d)
 
@@ -118,7 +121,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	catalogRequest, err := sdk.RequestCatalogItem(requestTemplate)
 
 	if err != nil {
-		log.Errorf("The destroy deployment request failed with error: %v ", err)
+		log.Errorf("Resource Machine Request Failed: %v", err)
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
 	//Set request ID
@@ -142,7 +145,7 @@ func updateRequestTemplate(templateInterface map[string]interface{}, field strin
 // This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
 // The update is performed on the Deployment using supported (day-2) actions.
 func updateResource(d *schema.ResourceData, meta interface{}) error {
-
+	vraClient = meta.(*client.APIClient)
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 	// Get client handle
@@ -241,6 +244,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 // This function retrieves the latest state of a vRA 7 deployment. Terraform updates its state based on
 // the information returned by this function.
 func readResource(d *schema.ResourceData, meta interface{}) error {
+	vraClient = meta.(*client.APIClient)
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
 
@@ -306,6 +310,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 //Function use - To delete resources which are created by terraform and present in state file
 //Terraform call - terraform destroy
 func deleteResource(d *schema.ResourceData, meta interface{}) error {
+	vraClient = meta.(*client.APIClient)
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
 	// Throw an error if request ID has no value or empty value
@@ -477,7 +482,7 @@ func checkConfigValuesValidity(d *schema.ResourceData) (*utils.CatalogItemReques
 	// get the business group id from name
 	var businessGroupIDFromName string
 	if len(businessGroupName) > 0 {
-		businessGroupIDFromName, err = sdk.GetBusinessGroupID(businessGroupName, "qe")
+		businessGroupIDFromName, err = sdk.GetBusinessGroupID(businessGroupName, vraClient.Tenant)
 		if err != nil || businessGroupIDFromName == "" {
 			return nil, err
 		}

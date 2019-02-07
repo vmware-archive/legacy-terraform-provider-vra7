@@ -17,12 +17,10 @@ func NewClient(d *schema.ResourceData) APIClient {
 	transport.TLSClientConfig = &tls.Config{
 		InsecureSkipVerify: d.Get("insecure").(bool),
 	}
-
 	httpClient := &http.Client{
 		// Timeout:   clientTimeout,
 		Transport: transport,
 	}
-
 	apiClient = APIClient{
 		Username: d.Get("username").(string),
 		Password: d.Get("password").(string),
@@ -37,20 +35,16 @@ func NewClient(d *schema.ResourceData) APIClient {
 // DoRequest makes the request and returns the response
 func DoRequest(req *APIRequest, login bool) (*APIResponse, error) {
 	r, err := FromAPIRequestToHTTPRequest(req)
-
 	if err != nil {
 		return nil, err
 	}
-
 	if !login {
-		err = addToken(r)
+		err = AddToken(r)
 		if err != nil {
 			return nil, err
 		}
-
 	}
 	r.Header.Add(ConnectionHeader, CloseConnection)
-
 	resp, err := apiClient.Client.Do(r)
 	if err != nil {
 		log.Error("An error occurred when calling %v on %v. Error: %v", req.Method, req.URL, err)
@@ -60,7 +54,8 @@ func DoRequest(req *APIRequest, login bool) (*APIResponse, error) {
 	return FromHTTPRespToAPIResp(resp)
 }
 
-func addToken(req *http.Request) error {
+// AddToken gets the token and adds to the request header
+func AddToken(req *http.Request) error {
 	log.Info("Get Token for the Request to: %v", req.URL)
 	var (
 		token string
@@ -71,7 +66,6 @@ func addToken(req *http.Request) error {
 	if err != nil {
 		return err
 	}
-
 	req.Header.Add(AuthorizationHeader, fmt.Sprintf("Bearer %s", token))
 	return nil
 }
