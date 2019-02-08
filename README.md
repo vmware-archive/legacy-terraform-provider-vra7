@@ -11,7 +11,7 @@ These instructions will get you a copy of the project up and run on your local m
 
 To get the vRA plugin up and running you need the following things.
 * [Terraform 0.9 or above](https://www.terraform.io/downloads.html)
-* [Go Language 1.11 or above](https://golang.org/dl/)
+* [Go Language 1.11.4 or above](https://golang.org/dl/)
 
 ## Project Setup
 
