@@ -18,7 +18,7 @@ var (
 func GetCatalogItemRequestTemplate(catalogItemID string) (*utils.CatalogItemRequestTemplate, error) {
 
 	//Form a path to read catalog request template via REST call
-	path := fmt.Sprintf(utils.RequestTemplateAPI, catalogItemID)
+	path := fmt.Sprintf(RequestTemplateAPI, catalogItemID)
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
@@ -36,7 +36,7 @@ func GetCatalogItemRequestTemplate(catalogItemID string) (*utils.CatalogItemRequ
 // ReadCatalogItemNameByID - This function returns the catalog item name using catalog item ID
 func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 
-	path := fmt.Sprintf(utils.EntitledCatalogItems+"/"+"%s", catalogItemID)
+	path := fmt.Sprintf(EntitledCatalogItems+"/"+"%s", catalogItemID)
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
@@ -51,28 +51,6 @@ func ReadCatalogItemNameByID(catalogItemID string) (string, error) {
 	return response.CatalogItem.Name, nil
 }
 
-// ReadCatalogItemIdByName - To read id of catalog from vRA using catalog_name
-// func ReadCatalogItemByName(catalogName string) (string, error) {
-//
-// 	path := "/catalog-service/api/consumer/entitledCatalogItemViews"
-// 	log.Info("Fetching business group id from name..GET %s ", path)
-// 	uri := client.BuildEncodedURL(path+"?$filter=name eq "+catalogName, nil)
-// 	customURL := strings.Replace(uri, "%3F", "?", -1)
-//
-// 	respBody, respErr := client.Get(customURL, nil)
-// 	if respErr != nil {
-// 		return "", respErr
-// 	}
-//
-// 	var response CatalogItem
-// 	unmarshallErr := utils.UnmarshalJSON(respBody, &response)
-// 	if unmarshallErr != nil {
-// 		return "", unmarshallErr
-// 	}
-// 	log.Info("the catalog item is %v ", response.CatalogItem.ID)
-// 	return response.CatalogItem.ID, nil
-// }
-
 // ReadCatalogItemByName to read id of catalog from vRA using catalog_name
 func ReadCatalogItemByName(catalogName string) (string, error) {
 	var catalogItemID string
@@ -80,7 +58,7 @@ func ReadCatalogItemByName(catalogName string) (string, error) {
 	log.Info("readCatalogItemIdByName->catalog_name %v\n", catalogName)
 
 	//Set a call to read number of catalogs from vRA
-	path := fmt.Sprintf(utils.EntitledCatalogItemViewsAPI)
+	path := fmt.Sprintf(EntitledCatalogItemViewsAPI)
 
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
@@ -137,30 +115,36 @@ func GetBusinessGroupID(businessGroupName string, tenant string) (string, error)
 
 	log.Info("Fetching business group id from name..GET %s ", path)
 
-	uri := client.BuildEncodedURL(path+"?$filter=name eq "+businessGroupName, nil)
-	customURL := strings.Replace(uri, "%3F", "?", -1)
+	url := client.BuildEncodedURL(path, nil)
 
 	//url := client.BuildEncodedURL(cus, nil)
-	resp, respErr := client.Get(customURL, nil)
+	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
 		return "", respErr
 	}
 
-	var businessGroup utils.BusinessGroups
-	unmarshallErr := utils.UnmarshalJSON(resp.Body, &businessGroup)
+	var businessGroups utils.BusinessGroups
+	unmarshallErr := utils.UnmarshalJSON(resp.Body, &businessGroups)
 	if unmarshallErr != nil {
 		return "", unmarshallErr
 	}
 	// BusinessGroups array will contain only one BusinessGroup element containing the BG
 	// with the name businessGroupName.
-	// Fetch the id of that BG
-	return businessGroup.Content[0].ID, nil
+	// Fetch the id of that
+	for _, businessGroup := range businessGroups.Content {
+		if businessGroup.Name == businessGroupName {
+			log.Info("Found the business group id of the group %s: %s ", businessGroupName, businessGroup.ID)
+			return businessGroup.ID, nil
+		}
+	}
+	log.Errorf("No business group found with name: %s ", businessGroupName)
+	return "", fmt.Errorf("No business group found with name: %s ", businessGroupName)
 }
 
 //DestroyMachine - To set resource destroy call
 func DestroyMachine(resourceID, actionID string, destroyTemplate *utils.ResourceActionTemplate) error {
 
-	destroyActionURL := fmt.Sprintf(utils.PostActionTemplateAPI, resourceID, actionID)
+	destroyActionURL := fmt.Sprintf(PostActionTemplateAPI, resourceID, actionID)
 	buffer, _ := utils.MarshalToJSON(destroyTemplate)
 	url := client.BuildEncodedURL(destroyActionURL, nil)
 	resp, respErr := client.Post(url, buffer, nil)
@@ -174,7 +158,7 @@ func DestroyMachine(resourceID, actionID string, destroyTemplate *utils.Resource
 // which is used to show information to user post create call.
 func GetRequestStatus(requestID string) (*utils.RequestStatusView, error) {
 	//Form a URL to read request status
-	path := fmt.Sprintf(utils.ConsumerRequests+"/"+"%s", requestID)
+	path := fmt.Sprintf(ConsumerRequests+"/"+"%s", requestID)
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
@@ -192,7 +176,7 @@ func GetRequestStatus(requestID string) (*utils.RequestStatusView, error) {
 // GetDeploymentState - Read the state of a vRA7 Deployment
 func GetDeploymentState(CatalogRequestID string) (*utils.ResourceView, error) {
 	//Form an URL to fetch resource list view
-	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, CatalogRequestID)
+	path := fmt.Sprintf(GetRequestResourceViewAPI, CatalogRequestID)
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
@@ -209,7 +193,7 @@ func GetDeploymentState(CatalogRequestID string) (*utils.ResourceView, error) {
 
 // GetRequestResourceView retrieves the resources that were provisioned as a result of a given request.
 func GetRequestResourceView(catalogRequestID string) (*utils.RequestResourceView, error) {
-	path := fmt.Sprintf(utils.GetRequestResourceViewAPI, catalogRequestID)
+	path := fmt.Sprintf(GetRequestResourceViewAPI, catalogRequestID)
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
 	if respErr != nil {
@@ -227,7 +211,7 @@ func GetRequestResourceView(catalogRequestID string) (*utils.RequestResourceView
 //RequestCatalogItem - Make a catalog request.
 func RequestCatalogItem(requestTemplate *utils.CatalogItemRequestTemplate) (*utils.CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
-	path := fmt.Sprintf(utils.EntitledCatalogItems+"/"+"%s"+
+	path := fmt.Sprintf(EntitledCatalogItems+"/"+"%s"+
 		"/requests", requestTemplate.CatalogItemID)
 
 	buffer, _ := utils.MarshalToJSON(requestTemplate)
@@ -247,7 +231,7 @@ func RequestCatalogItem(requestTemplate *utils.CatalogItemRequestTemplate) (*uti
 
 // GetResourceActions get the resource actions allowed for a resource
 func GetResourceActions(catalogItemRequestID string) (*utils.ResourceActions, error) {
-	path := fmt.Sprintf(utils.GetResourceAPI, catalogItemRequestID)
+	path := fmt.Sprintf(GetResourceAPI, catalogItemRequestID)
 
 	url := client.BuildEncodedURL(path, nil)
 	resp, respErr := client.Get(url, nil)
@@ -265,7 +249,7 @@ func GetResourceActions(catalogItemRequestID string) (*utils.ResourceActions, er
 
 // GetResourceActionTemplate get the action template corresponding to the action id
 func GetResourceActionTemplate(resourceID, actionID string) (*utils.ResourceActionTemplate, error) {
-	getActionTemplatePath := fmt.Sprintf(utils.GetActionTemplateAPI, resourceID, actionID)
+	getActionTemplatePath := fmt.Sprintf(GetActionTemplateAPI, resourceID, actionID)
 	log.Info("Call GET to fetch the reconfigure action template %v ", getActionTemplatePath)
 	url := client.BuildEncodedURL(getActionTemplatePath, nil)
 	resp, respErr := client.Get(url, nil)
@@ -284,7 +268,7 @@ func GetResourceActionTemplate(resourceID, actionID string) (*utils.ResourceActi
 // PostResourceAction updates the resource
 func PostResourceAction(resourceID, actionID string, resourceActionTemplate *utils.ResourceActionTemplate) error {
 
-	postActionTemplatePath := fmt.Sprintf(utils.PostActionTemplateAPI, resourceID, actionID)
+	postActionTemplatePath := fmt.Sprintf(PostActionTemplateAPI, resourceID, actionID)
 	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
 	url := client.BuildEncodedURL(postActionTemplatePath, nil)
 	resp, respErr := client.Post(url, buffer, nil)
