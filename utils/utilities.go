@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -24,19 +23,8 @@ const (
 
 	// utility constants
 
-	LoggerID             = "terraform-provider-vra7"
-	WindowsPathSeparator = "\\"
-	UnixPathSeparator    = "/"
-	WindowsOs            = "windows"
+	LoggerID = "terraform-provider-vra7"
 )
-
-// GetPathSeparator returns the path separator based on the OS type
-func GetPathSeparator() string {
-	if runtime.GOOS == WindowsOs {
-		return WindowsPathSeparator
-	}
-	return UnixPathSeparator
-}
 
 // UnmarshalJSON  decodes json
 func UnmarshalJSON(data []byte, v interface{}) error {
