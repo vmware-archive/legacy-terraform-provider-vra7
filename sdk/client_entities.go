@@ -1,4 +1,4 @@
-package client
+package sdk
 
 import (
 	"io"
@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// APIResponse struct
 type APIResponse struct {
 	Headers    http.Header
 	Body       []byte
@@ -13,6 +14,7 @@ type APIResponse struct {
 	StatusCode int
 }
 
+//APIRequest struct
 type APIRequest struct {
 	Method  string
 	URL     string
@@ -20,10 +22,10 @@ type APIRequest struct {
 	Body    io.Reader
 }
 
-// Represents an error from the Photon API.
+// APIError represents an error from the vRA API.
 type APIError struct {
 	Message        string `json:"message"`
-	HttpStatusCode int    `json:"-"` // Not part of API contract
+	HTTPStatusCode int    `json:"-"` // Not part of API contract
 }
 
 //AuthResponse - This struct contains response of user authentication call.
@@ -33,6 +35,7 @@ type AuthResponse struct {
 	Tenant  string    `json:"tenant"`
 }
 
+// AuthenticationRequest represents the auth request to vra
 type AuthenticationRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`

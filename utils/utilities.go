@@ -9,6 +9,27 @@ import (
 	"strings"
 )
 
+// terraform provider constants
+const (
+	CatalogName             = "catalog_name"
+	CatalogID               = "catalog_id"
+	BusinessGroupID         = "businessgroup_id"
+	BusinessGroupName       = "businessgroup_name"
+	WaitTimeout             = "wait_timeout"
+	FailedMessage           = "failed_message"
+	DeploymentConfiguration = "deployment_configuration"
+	ResourceConfiguration   = "resource_configuration"
+	CatalogConfiguration    = "catalog_configuration"
+	RequestStatus           = "request_status"
+
+	// utility constants
+
+	LoggerID             = "terraform-provider-vra7"
+	WindowsPathSeparator = "\\"
+	UnixPathSeparator    = "/"
+	WindowsOs            = "windows"
+)
+
 // GetPathSeparator returns the path separator based on the OS type
 func GetPathSeparator() string {
 	if runtime.GOOS == WindowsOs {
@@ -17,7 +38,7 @@ func GetPathSeparator() string {
 	return UnixPathSeparator
 }
 
-// Unmarshal - decodes json
+// UnmarshalJSON  decodes json
 func UnmarshalJSON(data []byte, v interface{}) error {
 	err := json.Unmarshal(data, v)
 	if err != nil {
@@ -26,7 +47,7 @@ func UnmarshalJSON(data []byte, v interface{}) error {
 	return nil
 }
 
-// Marshal the object to JSON and convert to *bytes.Buffer
+// MarshalToJSON the object to JSON and convert to *bytes.Buffer
 func MarshalToJSON(v interface{}) (*bytes.Buffer, error) {
 	buffer := new(bytes.Buffer)
 	err := json.NewEncoder(buffer).Encode(v)
@@ -36,6 +57,7 @@ func MarshalToJSON(v interface{}) (*bytes.Buffer, error) {
 	return buffer, nil
 }
 
+// ConvertInterfaceToString cpnverts interface to string
 func ConvertInterfaceToString(interfaceData interface{}) string {
 	var stringData string
 	if reflect.ValueOf(interfaceData).Kind() == reflect.Float64 {
@@ -54,8 +76,9 @@ func ConvertInterfaceToString(interfaceData interface{}) string {
 	return stringData
 }
 
-// update the resource configuration with the deployment resource data.
-// if there is difference between the config data and deployment data, return true
+// UpdateResourceConfigurationMap updates the resource configuration with
+//the deployment resource data if there is difference
+// between the config data and deployment data, return true
 func UpdateResourceConfigurationMap(
 	resourceConfiguration map[string]interface{}, vmData map[string]map[string]interface{}) (map[string]interface{}, bool) {
 	var changed bool
@@ -76,7 +99,8 @@ func UpdateResourceConfigurationMap(
 	return resourceConfiguration, changed
 }
 
-//Replace the value for a given key in a catalog request template.
+// ReplaceValueInRequestTemplate replaces the value for a given key in a catalog
+// request template.
 func ReplaceValueInRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) (map[string]interface{}, bool) {
 	var replaced bool
 	//Iterate over the map to get field provided as an argument
@@ -99,7 +123,8 @@ func ReplaceValueInRequestTemplate(templateInterface map[string]interface{}, fie
 	return templateInterface, replaced
 }
 
-//modeled after replaceValueInRequestTemplate, for values being added to template vs updating existing ones
+// AddValueToRequestTemplate modeled after replaceValueInRequestTemplate
+// for values being added to template vs updating existing ones
 func AddValueToRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
 	//simplest case is adding a simple value. Leaving as a func in case there's a need to do more complicated additions later
 	//	templateInterface[data]

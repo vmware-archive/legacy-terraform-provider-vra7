@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/terraform"
-	vra_client "github.com/vmware/terraform-provider-vra7/client"
+	"github.com/vmware/terraform-provider-vra7/sdk"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
@@ -138,7 +138,13 @@ func resourceSchema() map[string]*schema.Schema {
 func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	//Create a client handle to perform REST calls for various operations upon the resource
 
-	vraClient := vra_client.NewClient(r)
+	log.Info(" the resource schema is %v ", r)
+	user := r.Get("username").(string)
+	password := r.Get("password").(string)
+	tenant := r.Get("tenant").(string)
+	baseURL := r.Get("host").(string)
+	insecure := r.Get("insecure").(bool)
+	vraClient := sdk.NewClient(user, password, tenant, baseURL, insecure)
 
 	log.Info("inside provider %v ", vraClient)
 

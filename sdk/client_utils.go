@@ -1,4 +1,4 @@
-package client
+package sdk
 
 import (
 	"encoding/json"
@@ -12,29 +12,25 @@ import (
 )
 
 var (
-	log       = logging.MustGetLogger(utils.LoggerID)
-	apiClient APIClient
+	log = logging.MustGetLogger(utils.LoggerID)
 )
 
+// client constants
 const (
-	// Common header key
 	ContentTypeHeader   = "Content-Type"
 	AuthorizationHeader = "Authorization"
 	ConnectionHeader    = "Connection"
 	AcceptHeader        = "Accept"
-
-	// Common header values
-	AppJSON         = "application/json"
-	CloseConnection = "close"
-
-	// Http Methods
-	GET    = "GET"
-	POST   = "POST"
-	PATCH  = "PATCH"
-	PUT    = "PUT"
-	DELETE = "DELETE"
+	AppJSON             = "application/json"
+	CloseConnection     = "close"
+	GET                 = "GET"
+	POST                = "POST"
+	PATCH               = "PATCH"
+	PUT                 = "PUT"
+	DELETE              = "DELETE"
 )
 
+// APIClient represents the vra http client used throughout this provider
 type APIClient struct {
 	Username    string
 	Password    string
@@ -45,6 +41,7 @@ type APIClient struct {
 	Client      *http.Client
 }
 
+// AddHeader adds headers to the request
 func (ar *APIRequest) AddHeader(key, val string) {
 	if ar.Headers == nil {
 		ar.Headers = make(map[string]string)
@@ -52,6 +49,7 @@ func (ar *APIRequest) AddHeader(key, val string) {
 	ar.Headers[key] = val
 }
 
+//ContentType returns the content type set in the request header
 func (ar *APIRequest) ContentType() string {
 	if ar.Headers == nil {
 		return ""
@@ -74,7 +72,7 @@ func (ar *APIRequest) CopyHeadersTo(req *http.Request) {
 // Error Implement Go error interface for ApiError
 func (e APIError) Error() string {
 	return fmt.Sprintf("Error: { HTTP status: '%v', message: '%v'}",
-		e.HttpStatusCode, e.Message)
+		e.HTTPStatusCode, e.Message)
 }
 
 // GetAPIError reads an error out of the HTTP response, or does nothing if
@@ -88,7 +86,7 @@ func GetAPIError(respBody []byte, statusCode int) error {
 		apiError.Message = string(respBody)
 	}
 
-	apiError.HttpStatusCode = statusCode
+	apiError.HTTPStatusCode = statusCode
 	return apiError
 }
 
@@ -125,9 +123,9 @@ func FromHTTPRespToAPIResp(resp *http.Response) (*APIResponse, error) {
 }
 
 // BuildEncodedURL build the url by adding the base url and headers, etc
-func BuildEncodedURL(relativePath string, queryParameters map[string]string) string {
+func (c *APIClient) BuildEncodedURL(relativePath string, queryParameters map[string]string) string {
 	//Todo it might be better to swith to Viper to load all the config at once
-	serverURL := apiClient.BaseURL
+	serverURL := c.BaseURL
 
 	var queryURL *url.URL
 	queryURL, err := url.Parse(serverURL)

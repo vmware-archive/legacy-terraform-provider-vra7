@@ -1,4 +1,4 @@
-package utils
+package sdk
 
 import (
 	"time"
@@ -214,6 +214,8 @@ type CatalogItem struct {
 	CatalogItem catalogName `json:"catalogItem"`
 }
 
+// EntitledCatalogItemViews represents catalog items in an active state, the current user
+// is entitled to consume
 type EntitledCatalogItemViews struct {
 	Links    interface{} `json:"links"`
 	Content  interface{} `json:"content"`
