@@ -21,12 +21,13 @@ func NewClient(user, password, tenant, baseURL string, insecure bool) APIClient 
 	}
 	log.Critical("user %s ", user)
 	apiClient := APIClient{
-		Username: user,
-		Password: password,
-		Tenant:   tenant,
-		BaseURL:  baseURL,
-		Insecure: insecure,
-		Client:   httpClient,
+		Username:    user,
+		Password:    password,
+		Tenant:      tenant,
+		BaseURL:     baseURL,
+		Insecure:    insecure,
+		BearerToken: "",
+		Client:      httpClient,
 	}
 	return apiClient
 }
@@ -38,13 +39,10 @@ func (c *APIClient) DoRequest(req *APIRequest, login bool) (*APIResponse, error)
 		return nil, err
 	}
 	if !login {
-		err = c.AddToken(r)
-		if err != nil {
-			return nil, err
-		}
+		c.Authenticate()
+		r.Header.Add(AuthorizationHeader, c.BearerToken)
 	}
 	r.Header.Add(ConnectionHeader, CloseConnection)
-	log.Critical("the request object is %v ", r)
 	resp, err := c.Client.Do(r)
 	if err != nil {
 		log.Error("An error occurred when calling %v on %v. Error: %v", req.Method, req.URL, err)
@@ -54,24 +52,8 @@ func (c *APIClient) DoRequest(req *APIRequest, login bool) (*APIResponse, error)
 	return FromHTTPRespToAPIResp(resp)
 }
 
-// AddToken gets the token and adds to the request header
-func (c *APIClient) AddToken(req *http.Request) error {
-	log.Info("Get Token for the Request to: %v", req.URL)
-	var (
-		token string
-		err   error
-	)
-
-	token, err = c.Authenticate()
-	if err != nil {
-		return err
-	}
-	req.Header.Add(AuthorizationHeader, fmt.Sprintf("Bearer %s", token))
-	return nil
-}
-
 // Authenticate authenticates for the first time when the provider is invoked
-func (c *APIClient) Authenticate() (string, error) {
+func (c *APIClient) Authenticate() error {
 	uri := fmt.Sprintf("%s"+Tokens, c.BaseURL)
 	data := AuthenticationRequest{
 		Username: c.Username,
@@ -93,16 +75,17 @@ func (c *APIClient) Authenticate() (string, error) {
 }
 
 // DoLogin returns the bearer token
-func (c *APIClient) DoLogin(apiReq *APIRequest) (string, error) {
+func (c *APIClient) DoLogin(apiReq *APIRequest) error {
 	apiResp, err := c.DoRequest(apiReq, true)
 	if err != nil {
-		return "", err
+		return err
 	}
 	response := &AuthResponse{}
 
 	err = json.Unmarshal(apiResp.Body, response)
 	if err != nil {
-		return "", err
+		return err
 	}
-	return response.ID, nil
+	c.BearerToken = fmt.Sprintf("Bearer %s", response.ID)
+	return nil
 }

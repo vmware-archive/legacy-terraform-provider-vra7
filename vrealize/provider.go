@@ -149,7 +149,7 @@ func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	log.Info("inside provider %v ", vraClient)
 
 	//Authenticate user
-	_, err := vraClient.Authenticate()
+	err := vraClient.Authenticate()
 
 	//Raise an error on authentication fail
 	if err != nil {
