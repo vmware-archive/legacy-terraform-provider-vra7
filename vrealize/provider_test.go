@@ -1,65 +1,75 @@
 package vrealize
 
-// import (
-// 	"errors"
-// 	"fmt"
-// 	"github.com/hashicorp/terraform/helper/schema"
-// 	"github.com/hashicorp/terraform/terraform"
-// 	"gopkg.in/jarcoal/httpmock.v1"
-// 	"testing"
-// )
-//
-// var testProviders map[string]terraform.ResourceProvider
-// var testProvider *schema.Provider
-//
-// func init() {
-// 	testProvider = Provider().(*schema.Provider)
-// 	testProviders = map[string]terraform.ResourceProvider{
-// 		"vra7": testProvider,
-// 	}
-//
-// 	t := new(testing.T)
-// 	fmt.Println("init")
-// 	client = NewClient(
-// 		"admin@myvra.local",
-// 		"pass!@#",
-// 		"vsphere.local",
-// 		"http://localhost/",
-// 		true,
-// 	)
-// 	httpmock.Activate()
-// 	defer httpmock.DeactivateAndReset()
-//
-// 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-// 		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-// 		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZX
-// 		JuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY
-// 		4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4
-// 		ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
-//
-// 	client.Authenticate()
-//
-// 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-// 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
-//
-// 	err := client.Authenticate()
-// 	if err == nil {
-// 		t.Errorf("Authentication should fail")
-// 	}
-// }
-//
-// func TestValidateProvider(t *testing.T) {
-// 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-// 		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
-//
-// 	err := client.Authenticate()
-// 	if err == nil {
-// 		t.Errorf("Authentication should fail")
-// 	}
-// }
-//
-// func TestProvider(t *testing.T) {
-// 	if err := Provider().(*schema.Provider).InternalValidate(); err != nil {
-// 		t.Fatalf("err: %s", err)
-// 	}
-// }
+import (
+	"github.com/vmware/terraform-provider-vra7/utils"
+	"fmt"
+	"github.com/hashicorp/terraform/helper/schema"
+	"github.com/hashicorp/terraform/terraform"
+	"gopkg.in/jarcoal/httpmock.v1"
+	"github.com/vmware/terraform-provider-vra7/sdk"
+	"testing"
+)
+
+var (
+	testProviders map[string]terraform.ResourceProvider
+    testProvider *schema.Provider
+	client   sdk.APIClient
+	user     = "admin@myvra.local"
+	password = "pass!@#"
+	tenant   = "vsphere.local"
+	baseURL  = "http://localhost"
+	insecure = true
+
+	validAuthResponse =
+	`{  
+		"expires":"2019-02-26T03:32:35.000Z",
+		"id":"MTU1MTEyMzE1NTc5ODpiYTZkYjdhNjZlNGNkYjZmZTBiMjp0ZW5hbnQ6cWV1c2VybmFtZTpmcml0ekBjb2tlLnNxYS1ob3Jpem9uLmxvY2FsZXhwaXJhdGlvbjoxNTUxMTUxOTU1MDAwOmMyNGVjNTFiNzE1OTJhZDZjNTljMTUwMDkxMjcyNzUyZDkzNzQ0ODRkMTVlZGFhNWM0MDhjYmQ3YTM2MTljZGNiNjM3MjM1NmY1MzZlYTk1YzUyMGZiZDVjMTkzMzg3YjQzZmMwNmNlMGI5YjJkZmIwNzhlZGU2NzdiNTk3MWFk",
+		"tenant":"qe"
+	 }`
+
+	 errorAuthResponse =
+	 `{  
+		"errors":[  
+		   {  
+			  "code":90135,
+			  "source":null,
+			  "message":"Unable to authenticate user fritz@coke.sqa-horizon.local in tenant q.",
+			  "systemMessage":"90135-Unable to authenticate user fritz@coke.sqa-horizon.local in tenant q.",
+			  "moreInfoUrl":null
+		   }
+		]
+	 }`
+)
+
+func init() {
+
+	fmt.Println("init")
+	testProvider = Provider().(*schema.Provider)
+	testProviders = map[string]terraform.ResourceProvider{
+		"vra7": testProvider,
+	}
+	client = sdk.NewClient(user, password, tenant, baseURL, insecure)
+}
+
+func TestValidateProvider(t *testing.T) {
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
+
+	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
+		httpmock.NewStringResponder(200, validAuthResponse))
+
+	err := client.Authenticate()
+	utils.AssertNilError(t, err)
+
+	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
+		httpmock.NewStringResponder(90135, errorAuthResponse))
+
+	err = client.Authenticate()
+	utils.AssertNotNilError(t, err)
+}
+
+func TestProvider(t *testing.T) {
+	if err := Provider().(*schema.Provider).InternalValidate(); err != nil {
+		t.Fatalf("err: %s", err)
+	}
+}
