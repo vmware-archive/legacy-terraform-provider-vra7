@@ -11,14 +11,12 @@ import (
 )
 
 var (
-	testProviders map[string]terraform.ResourceProvider
-	testProvider  *schema.Provider
-	client        sdk.APIClient
-	user          = "admin@myvra.local"
-	password      = "pass!@#"
-	tenant        = "vsphere.local"
-	baseURL       = "http://localhost"
-	insecure      = true
+	client   sdk.APIClient
+	user     = "admin@myvra.local"
+	password = "pass!@#"
+	tenant   = "vsphere.local"
+	baseURL  = "http://localhost"
+	insecure = true
 
 	validAuthResponse = `{  
 		"expires":"2019-02-26T03:32:35.000Z",
@@ -42,10 +40,6 @@ var (
 func init() {
 
 	fmt.Println("init")
-	testProvider = Provider().(*schema.Provider)
-	testProviders = map[string]terraform.ResourceProvider{}
-		"vra7": testProvider,
-	}
 	client = sdk.NewClient(user, password, tenant, baseURL, insecure)
 }
 
