@@ -85,6 +85,14 @@ func AssertTrue(t *testing.T, message string, expression bool) {
 	}
 }
 
+// AssertFalse asserts when the message is true
+func AssertFalse(t *testing.T, message string, expression bool) {
+	if expression {
+		t.Helper()
+		t.Fatalf("%s: expected to be false, but it is true.", message)
+	}
+}
+
 // AssertNil asserts when the objectType is nil
 func AssertNil(t *testing.T, obj interface{}) {
 	if obj != nil {
