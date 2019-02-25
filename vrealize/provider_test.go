@@ -3,7 +3,6 @@ package vrealize
 import (
 	"fmt"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/terraform"
 	"github.com/vmware/terraform-provider-vra7/sdk"
 	"github.com/vmware/terraform-provider-vra7/utils"
 	"gopkg.in/jarcoal/httpmock.v1"
