@@ -24,8 +24,14 @@ type APIRequest struct {
 
 // APIError represents an error from the vRA API.
 type APIError struct {
-	Message        string `json:"message"`
-	HTTPStatusCode int    `json:"-"` // Not part of API contract
+	Errors []Error `json:"errors"`
+}
+
+//Error API Error
+type Error struct {
+	Code          int    `json:"code"`
+	Message       string `json:"message"`
+	SystemMessage string `json:"systemMessage"`
 }
 
 //AuthResponse - This struct contains response of user authentication call.

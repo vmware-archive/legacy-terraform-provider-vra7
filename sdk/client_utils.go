@@ -71,22 +71,23 @@ func (ar *APIRequest) CopyHeadersTo(req *http.Request) {
 
 // Error Implement Go error interface for ApiError
 func (e APIError) Error() string {
-	return fmt.Sprintf("Error: { HTTP status: '%v', message: '%v'}",
-		e.HTTPStatusCode, e.Message)
+	return fmt.Sprintf("vRealize API: %+v", e.Errors)
 }
 
 // GetAPIError reads an error out of the HTTP response, or does nothing if
 // no error occured.
 func GetAPIError(respBody []byte, statusCode int) error {
 	apiError := APIError{}
+	e := Error{}
 	unmarshalErr := json.Unmarshal(respBody, &apiError)
 	if unmarshalErr != nil {
 		// Do not return this error just log it.
 		log.Error("Error is %v ", unmarshalErr)
-		apiError.Message = string(respBody)
+		e.Message = string(respBody)
 	}
 
-	apiError.HTTPStatusCode = statusCode
+	e.Code = statusCode
+	apiError.Errors = append(apiError.Errors, e)
 	return apiError
 }
 
