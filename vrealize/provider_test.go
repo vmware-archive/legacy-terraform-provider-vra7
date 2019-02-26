@@ -35,7 +35,7 @@ var (
 		]
 	 }`
 
-	 mockRequestTemplate = `{
+	mockRequestTemplate = `{
 		"type":"com.vmware.vcac.catalog.domain.request.CatalogItemProvisioningRequest",
 		"catalogItemId":"dhbh-jhdv-ghdv-dhvdd",
 		"requestedFor":"mock@mock.com",
