@@ -200,24 +200,6 @@ func (c *APIClient) GetRequestStatus(requestID string) (*RequestStatusView, erro
 	return &response, nil
 }
 
-// GetDeploymentState - Read the state of a vRA7 Deployment
-func (c *APIClient) GetDeploymentState(CatalogRequestID string) (*ResourceView, error) {
-	//Form an URL to fetch resource list view
-	path := fmt.Sprintf(GetRequestResourceViewAPI, CatalogRequestID)
-	url := c.BuildEncodedURL(path, nil)
-	resp, respErr := c.Get(url, nil)
-	if respErr != nil {
-		return nil, respErr
-	}
-
-	var response ResourceView
-	unmarshallErr := utils.UnmarshalJSON(resp.Body, &response)
-	if unmarshallErr != nil {
-		return nil, unmarshallErr
-	}
-	return &response, nil
-}
-
 // GetRequestResourceView retrieves the resources that were provisioned as a result of a given request.
 func (c *APIClient) GetRequestResourceView(catalogRequestID string) (*RequestResourceView, error) {
 	path := fmt.Sprintf(GetRequestResourceViewAPI, catalogRequestID)

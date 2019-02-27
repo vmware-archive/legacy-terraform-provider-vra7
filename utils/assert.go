@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -95,7 +96,7 @@ func AssertFalse(t *testing.T, message string, expression bool) {
 
 // AssertNil asserts when the objectType is nil
 func AssertNil(t *testing.T, obj interface{}) {
-	if obj != nil {
+	if !reflect.ValueOf(obj).IsNil() {
 		t.Helper()
 		t.Fatalf("Expected object %v to be null", obj)
 	}

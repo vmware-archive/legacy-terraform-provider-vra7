@@ -137,16 +137,12 @@ func resourceSchema() map[string]*schema.Schema {
 //Function use - To authenticate terraform provider
 func providerConfig(r *schema.ResourceData) (interface{}, error) {
 	//Create a client handle to perform REST calls for various operations upon the resource
-
-	log.Info(" the resource schema is %v ", r)
 	user := r.Get("username").(string)
 	password := r.Get("password").(string)
 	tenant := r.Get("tenant").(string)
 	baseURL := r.Get("host").(string)
 	insecure := r.Get("insecure").(bool)
 	vraClient := sdk.NewClient(user, password, tenant, baseURL, insecure)
-
-	log.Info("inside provider %v ", vraClient)
 
 	//Authenticate user
 	err := vraClient.Authenticate()

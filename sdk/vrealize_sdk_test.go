@@ -36,6 +36,7 @@ func TestGetCatalogItemRequestTemplate(t *testing.T) {
 
 	catalogItemReqTemplate, err := client.GetCatalogItemRequestTemplate(catalogItemID)
 	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, catalogItemReqTemplate)
 	utils.AssertEqualsString(t, catalogItemID, catalogItemReqTemplate.CatalogItemID)
 
 	catalogItemReqTemplate, err = client.GetCatalogItemRequestTemplate("635e5v-8e37efd60-hdgdh")
@@ -47,6 +48,7 @@ func TestGetCatalogItemRequestTemplate(t *testing.T) {
 	invalidCatalogItemID := "feaedf73-560c-4612-a573-0041667e0176"
 	catalogItemReqTemplate, err = client.GetCatalogItemRequestTemplate(invalidCatalogItemID)
 	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, catalogItemReqTemplate)
 
 }
 
@@ -100,12 +102,120 @@ func TestGetBusinessGroupID(t *testing.T) {
 	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, subTenantsResponse))
 
 	id, err := client.GetBusinessGroupID("Development", tenant)
+	utils.AssertNilError(t, err)
+	utils.AssertEqualsString(t, "b2470b94-cbca-43db-be37-803cca7b0f1a", id)
+}
 
-	if id == "b2470b94-cbca-43db-be37-803cca7b0f1a" {
-		fmt.Println("Passed")
-	}
+func TestGetRequestStatus(t *testing.T) {
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
 
-	if err != nil {
-		t.Errorf("Error fetching is %v ", err)
-	}
+	mockRequestID := "adca9535-4a35-4981-8864-28643bd990b0"
+	path := fmt.Sprintf(ConsumerRequests+"/"+"%s", mockRequestID)
+	url := client.BuildEncodedURL(path, nil)
+	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, requestStatusResponse))
+
+	requestStatus, err := client.GetRequestStatus(mockRequestID)
+	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, requestStatus)
+	utils.AssertEqualsString(t, "IN_PROGRESS", requestStatus.Phase)
+
+	// invalid request id
+	mockRequestID = "gd78tegd-0e737egd-jhdg"
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(20111, requestStatusErrResponse))
+	requestStatus, err = client.GetRequestStatus(mockRequestID)
+	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, requestStatus)
+}
+
+func TestGetRequestResourceView(t *testing.T) {
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
+
+	mockRequestID := "594bf7ec-c8d2-4a0d-8477-553ed987aa48"
+	path := fmt.Sprintf(GetRequestResourceViewAPI, mockRequestID)
+	url := client.BuildEncodedURL(path, nil)
+	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, deploymentStateResponse))
+
+	resourceView, err := client.GetRequestResourceView(mockRequestID)
+	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, resourceView)
+
+	// invalid request id
+	mockRequestID = "gd78tegd-0e737egd-jhdg"
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(20111, requestStatusErrResponse))
+	resourceView, err = client.GetRequestResourceView(mockRequestID)
+	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, resourceView)
+}
+
+func TestGetResourceActions(t *testing.T) {
+
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
+
+	mockRequestID := "6ec160e5-41c5-4b1d-8ddc-e89c426957c6"
+	path := fmt.Sprintf(GetResourceAPI, mockRequestID)
+	url := client.BuildEncodedURL(path, nil)
+	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, resourceActionsResponse))
+
+	resourceActions, err := client.GetResourceActions(mockRequestID)
+	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, resourceActions)
+
+	// invalid request id
+	mockRequestID = "gd78tegd-0e737egd-jhdg"
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(20111, requestStatusErrResponse))
+	resourceActions, err = client.GetResourceActions(mockRequestID)
+	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, resourceActions)
+}
+
+func TestGetResourceActionTemplate(t *testing.T) {
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
+
+	mockResourceID := "0786a919-3545-408d-9091-cc8fe24e7790"
+	mockActionID := "1a22752b-31a9-462e-a38a-e42b60c08a78"
+
+	// test for delete action template
+	getActionTemplatePath := fmt.Sprintf(GetActionTemplateAPI, mockResourceID, mockActionID)
+	url := client.BuildEncodedURL(getActionTemplatePath, nil)
+	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, deleteActionTemplateResponse))
+
+	actionTemplte, err := client.GetResourceActionTemplate(mockResourceID, mockActionID)
+	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, actionTemplte)
+
+	//test for reconfigure action tenplate
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, reconfigureActionTemplateResponse))
+	actionTemplte, err = client.GetResourceActionTemplate(mockResourceID, mockActionID)
+	utils.AssertNilError(t, err)
+	utils.AssertNotNil(t, actionTemplte)
+
+	// invalid resource id
+	mockResourceID = "gd78tegd-0e737egd-jhdg"
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(10101, invalidResourceErrorResponse))
+	actionTemplte, err = client.GetResourceActionTemplate(mockResourceID, mockActionID)
+	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, actionTemplte)
+
+	//invalid action id
+	mockActionID = "7364g-8736eg-87736"
+	httpmock.Reset()
+	httpmock.RegisterResponder("GET", url,
+		httpmock.NewStringResponder(50505, systemExceptionResponse))
+	actionTemplte, err = client.GetResourceActionTemplate(mockResourceID, mockActionID)
+	utils.AssertNotNilError(t, err)
+	utils.AssertNil(t, actionTemplte)
+
 }
