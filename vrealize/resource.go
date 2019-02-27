@@ -370,7 +370,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	for i := 0; i < waitTimeout/sleepFor; i++ {
 		time.Sleep(time.Duration(sleepFor) * time.Second)
 		log.Info("Checking to see if resource is deleted.")
-		deploymentStateData, err := vraClient.GetDeploymentState(catalogItemRequestID)
+		resourceView, err := vraClient.GetRequestResourceView(catalogItemRequestID)
 		if err != nil {
 			return fmt.Errorf("Resource view failed to load:  %v", err)
 		}
@@ -380,7 +380,7 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 			return fmt.Errorf("Machine cannot be deleted while request is in-progress state. Please try again later. \nRun terraform refresh to get the latest state of your request")
 		}
 
-		if len(deploymentStateData.Content) == 0 {
+		if len(resourceView.Content) == 0 {
 			//If resource got deleted then unset the resource ID from state file
 			d.SetId("")
 			break
