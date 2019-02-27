@@ -1,61 +1,44 @@
 package vrealize
 
 import (
-	"errors"
 	"fmt"
 	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/hashicorp/terraform/terraform"
+	"github.com/vmware/terraform-provider-vra7/sdk"
+	"github.com/vmware/terraform-provider-vra7/utils"
 	"gopkg.in/jarcoal/httpmock.v1"
 	"testing"
 )
 
-var testProviders map[string]terraform.ResourceProvider
-var testProvider *schema.Provider
+var (
+	client   sdk.APIClient
+	user     = "admin@myvra.local"
+	password = "pass!@#"
+	tenant   = "vsphere.local"
+	baseURL  = "http://localhost"
+	insecure = true
+)
 
 func init() {
-	testProvider = Provider().(*schema.Provider)
-	testProviders = map[string]terraform.ResourceProvider{
-		"vra7": testProvider,
-	}
 
-	t := new(testing.T)
 	fmt.Println("init")
-	client = NewClient(
-		"admin@myvra.local",
-		"pass!@#",
-		"vsphere.local",
-		"http://localhost/",
-		true,
-	)
-	httpmock.Activate()
-	defer httpmock.DeactivateAndReset()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewStringResponder(200, `{"expires":"2017-07-25T15:18:49.000Z",
-		"id":"MTUwMDk2NzEyOTEyOTplYTliNTA3YTg4MjZmZjU1YTIwZjp0ZW5hbnQ6dnNwaGVyZS5sb2NhbHVzZX
-		JuYW1lOmphc29uQGNvcnAubG9jYWxleHBpcmF0aW9uOjE1MDA5OTU5MjkwMDA6ZjE1OTQyM2Y1NjQ2YzgyZjY
-		4Yjg1NGFjMGNkNWVlMTNkNDhlZTljNjY3ZTg4MzA1MDViMTU4Y2U3MzBkYjQ5NmQ5MmZhZWM1MWYzYTg1ZWM4
-		ZDhkYmFhMzY3YTlmNDExZmM2MTRmNjk5MGQ1YjRmZjBhYjgxMWM0OGQ3ZGVmNmY=","tenant":"vsphere.local"}`))
-
-	client.Authenticate()
-
-	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
-
-	err := client.Authenticate()
-	if err == nil {
-		t.Errorf("Authentication should fail")
-	}
+	client = sdk.NewClient(user, password, tenant, baseURL, insecure)
 }
 
 func TestValidateProvider(t *testing.T) {
+	httpmock.ActivateNonDefault(client.Client)
+	defer httpmock.DeactivateAndReset()
+
 	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
-		httpmock.NewErrorResponder(errors.New(`{"errors":[{"code":90135,"source":null,"message":"Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","systemMessage":"90135-Unable to authenticate user jason@corp.local1 in tenant vsphere.local.","moreInfoUrl":null}]}`)))
+		httpmock.NewStringResponder(200, validAuthResponse))
 
 	err := client.Authenticate()
-	if err == nil {
-		t.Errorf("Authentication should fail")
-	}
+	utils.AssertNilError(t, err)
+
+	httpmock.RegisterResponder("POST", "http://localhost/identity/api/tokens",
+		httpmock.NewStringResponder(90135, errorAuthResponse))
+
+	err = client.Authenticate()
+	utils.AssertNotNilError(t, err)
 }
 
 func TestProvider(t *testing.T) {

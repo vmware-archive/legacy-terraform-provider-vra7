@@ -2,8 +2,9 @@ package utils
 
 import (
 	"os"
+	"path/filepath"
 
-	"github.com/op/go-logging"
+	logging "github.com/op/go-logging"
 )
 
 var (
@@ -22,7 +23,7 @@ func initTerraformVraProviderLog() {
 	//Setup terraform service log
 	var backendList = []logging.Backend{}
 	var logFile *os.File
-	logFile, err := os.OpenFile("."+GetPathSeparator()+terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile("."+string(filepath.Separator)+terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		f, err2 := os.OpenFile(terraformVraProviderFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err2 != nil {

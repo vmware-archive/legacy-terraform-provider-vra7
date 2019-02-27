@@ -1,10 +1,7 @@
-package vrealize
+package sdk
 
 import (
 	"time"
-
-	"github.com/hashicorp/terraform/helper/schema"
-	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
 // ResourceActionTemplate - is used to store information
@@ -195,83 +192,37 @@ type CatalogRequest struct {
 	} `json:"catalogItemRef"`
 }
 
-//ResourceMachine - use to set resource fields
-func ResourceMachine() *schema.Resource {
-	return &schema.Resource{
-		Create: createResource,
-		Read:   readResource,
-		Update: updateResource,
-		Delete: deleteResource,
-		Schema: resourceSchema(),
-	}
+//CatalogItemRequestTemplate - A structure that captures a catalog request template, to be filled in and POSTED.
+type CatalogItemRequestTemplate struct {
+	Type            string                 `json:"type"`
+	CatalogItemID   string                 `json:"catalogItemId"`
+	RequestedFor    string                 `json:"requestedFor"`
+	BusinessGroupID string                 `json:"businessGroupId"`
+	Description     string                 `json:"description"`
+	Reasons         string                 `json:"reasons"`
+	Data            map[string]interface{} `json:"data"`
 }
 
-//set_resource_schema - This function is used to update the catalog item template/blueprint
-//and replace the values with user defined values added in .tf file.
-func resourceSchema() map[string]*schema.Schema {
-	return map[string]*schema.Schema{
-		utils.CatalogName: {
-			Type:     schema.TypeString,
-			Optional: true,
-		},
-		utils.CatalogID: {
-			Type:     schema.TypeString,
-			Computed: true,
-			Optional: true,
-		},
-		utils.BusinessGroupID: {
-			Type:     schema.TypeString,
-			Computed: true,
-			Optional: true,
-		},
-		utils.BusinessGroupName: {
-			Type:     schema.TypeString,
-			Computed: true,
-			Optional: true,
-		},
-		utils.WaitTimeout: {
-			Type:     schema.TypeInt,
-			Optional: true,
-			Default:  15,
-		},
-		utils.RequestStatus: {
-			Type:     schema.TypeString,
-			Computed: true,
-			ForceNew: true,
-		},
-		utils.FailedMessage: {
-			Type:     schema.TypeString,
-			Computed: true,
-			ForceNew: true,
-			Optional: true,
-		},
-		utils.DeploymentConfiguration: {
-			Type:     schema.TypeMap,
-			Optional: true,
-			Elem: &schema.Schema{
-				Type:     schema.TypeMap,
-				Optional: true,
-				Elem:     schema.TypeString,
-			},
-		},
-		utils.ResourceConfiguration: {
-			Type:     schema.TypeMap,
-			Optional: true,
-			Computed: true,
-			Elem: &schema.Schema{
-				Type:     schema.TypeMap,
-				Optional: true,
-				Elem:     schema.TypeString,
-			},
-		},
-		utils.CatalogConfiguration: {
-			Type:     schema.TypeMap,
-			Optional: true,
-			Elem: &schema.Schema{
-				Type:     schema.TypeMap,
-				Optional: true,
-				Elem:     schema.TypeString,
-			},
-		},
-	}
+//catalogName - This struct holds catalog name from json response.
+type catalogName struct {
+	Name string `json:"name"`
+	ID   string `json:"catalogItemId"`
+}
+
+//CatalogItem - This struct holds the value of response of catalog item list
+type CatalogItem struct {
+	CatalogItem catalogName `json:"catalogItem"`
+}
+
+// EntitledCatalogItemViews represents catalog items in an active state, the current user
+// is entitled to consume
+type EntitledCatalogItemViews struct {
+	Links    interface{} `json:"links"`
+	Content  interface{} `json:"content"`
+	Metadata Metadata    `json:"metadata"`
+}
+
+// Metadata - Metadata  used to store metadata of resource list response
+type Metadata struct {
+	TotalElements int `json:"totalElements"`
 }
