@@ -7,7 +7,7 @@ env:
   - GO111MODULE=on
 
 before_install:
-  - go get -u golang.org/x/lint/golint
+  - go get golang.org/x/lint/golint
 
 script:
   - make check race release

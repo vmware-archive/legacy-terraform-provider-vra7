@@ -14,14 +14,6 @@ type ResourceActionTemplate struct {
 	Data        map[string]interface{} `json:"data,omitempty"`
 }
 
-// ResourceView - is used to store information
-// related to resource template information.
-type ResourceView struct {
-	Content []interface {
-	} `json:"content"`
-	Links []interface{} `json:"links"`
-}
-
 // RequestStatusView - used to store REST response of
 // request triggered against any resource.
 type RequestStatusView struct {

@@ -19,7 +19,6 @@ func NewClient(user, password, tenant, baseURL string, insecure bool) APIClient 
 		// Timeout:   clientTimeout,
 		Transport: transport,
 	}
-	log.Critical("user %s ", user)
 	apiClient := APIClient{
 		Username:    user,
 		Password:    password,
