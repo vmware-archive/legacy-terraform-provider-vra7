@@ -177,6 +177,10 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
 
+	if d.HasChange(utils.DeploymentConfiguration) {
+
+	}
+
 	// If any change made in resource_configuration.
 	if d.HasChange(utils.ResourceConfiguration) {
 		for _, resources := range resourceActions.Content {
@@ -448,7 +452,7 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 	var err error
 	// if catalog item id is provided, fetch the catalog item name
 	if len(p.CatalogItemName) > 0 {
-		catalogItemIDFromName, err = vraClient.ReadCatalogItemByName(p.CatalogItemName)
+		catalogItemIDFromName, err = vraClient.ReadCatalogItemByName(p.CatalogItemName, 1)
 		if err != nil || catalogItemIDFromName == "" {
 			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", p.CatalogItemName, err)
 		}

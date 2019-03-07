@@ -11,6 +11,7 @@ type ResourceActionTemplate struct {
 	ResourceID  string                 `json:"resourceId,omitempty"`
 	ActionID    string                 `json:"actionId,omitempty"`
 	Description string                 `json:"description,omitempty"`
+	Reasons     string                 `json:"reasons,omitempty"`
 	Data        map[string]interface{} `json:"data,omitempty"`
 }
 
@@ -216,5 +217,8 @@ type EntitledCatalogItemViews struct {
 
 // Metadata - Metadata  used to store metadata of resource list response
 type Metadata struct {
+	Size          int `json:"size"`
 	TotalElements int `json:"totalElements"`
+	TotalPages    int `json:"totalPages"`
+	Number        int `json:"number"`
 }
