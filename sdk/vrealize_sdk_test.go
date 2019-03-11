@@ -83,11 +83,11 @@ func TestReadCatalogItemByName(t *testing.T) {
 	httpmock.RegisterResponder("GET", url,
 		httpmock.NewStringResponder(200, entitledCatalogItemViewsResponse))
 
-	catalogItemID, err := client.ReadCatalogItemByName("CentOs", 1)
+	catalogItemID, err := client.ReadCatalogItemByName("CentOs")
 	utils.AssertEqualsString(t, "feaedf73-560c-4612-a573-41667e017691", catalogItemID)
 	utils.AssertNilError(t, err)
 
-	catalogItemID, err = client.ReadCatalogItemByName("Invalid Catalog Item name", 1)
+	catalogItemID, err = client.ReadCatalogItemByName("Invalid Catalog Item name")
 	utils.AssertEqualsString(t, "", catalogItemID)
 }
 

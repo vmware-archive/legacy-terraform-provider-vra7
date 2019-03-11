@@ -452,7 +452,7 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 	var err error
 	// if catalog item id is provided, fetch the catalog item name
 	if len(p.CatalogItemName) > 0 {
-		catalogItemIDFromName, err = vraClient.ReadCatalogItemByName(p.CatalogItemName, 1)
+		catalogItemIDFromName, err = vraClient.ReadCatalogItemByName(p.CatalogItemName)
 		if err != nil || catalogItemIDFromName == "" {
 			return nil, fmt.Errorf("Error in finding catalog item id corresponding to the catlog item name %v: \n %v", p.CatalogItemName, err)
 		}

@@ -92,41 +92,48 @@ func (c *APIClient) ReadCatalogItemNameByID(catalogItemID string) (string, error
 }
 
 // ReadCatalogItemByName to read id of catalog from vRA using catalog_name
-func (c *APIClient) ReadCatalogItemByName(catalogName string, count int) (string, error) {
+func (c *APIClient) ReadCatalogItemByName(catalogName string) (string, error) {
 
-	// Set a call to read number of catalogs from vRA
-	url := c.BuildEncodedURL(EntitledCatalogItemViewsAPI, map[string]string{
-		"page": strconv.Itoa(count)})
-	resp, respErr := c.Get(url, nil)
-	if respErr != nil || resp.StatusCode != 200 {
-		return "", respErr
+	entitled, err := c.ReadCatalogItemsByPage(1)
+	if err != nil {
+		return "", err
 	}
 
+	for i := 1; i <= entitled.Metadata.TotalElements; i++ {
+		entitled1, err := c.ReadCatalogItemsByPage(i)
+		if err != nil {
+			return "", err
+		}
+		catalogItemsArray := entitled1.Content.([]interface{})
+		for i := range catalogItemsArray {
+			catalogItem := catalogItemsArray[i].(map[string]interface{})
+			name := catalogItem["name"].(string)
+			if name == catalogName {
+				return catalogItem["catalogItemId"].(string), nil
+			}
+		}
+
+	}
+	return "", fmt.Errorf("Catalog item, %s not found", catalogName)
+}
+
+// ReadCatalogItemsByPage return catalogItems by page
+func (c *APIClient) ReadCatalogItemsByPage(i int) (*EntitledCatalogItemViews, error) {
+	url := c.BuildEncodedURL(EntitledCatalogItemViewsAPI, map[string]string{
+		"page": strconv.Itoa(i)})
+	resp, respErr := c.Get(url, nil)
+	if respErr != nil || resp.StatusCode != 200 {
+		return nil, respErr
+	}
+
+	log.Critical("the json response is %v ", string(resp.Body))
 	var template EntitledCatalogItemViews
 	unmarshallErr := utils.UnmarshalJSON(resp.Body, &template)
 	if unmarshallErr != nil {
-		return "", unmarshallErr
+		return nil, unmarshallErr
 	}
 
-	catalogItemsArray := template.Content.([]interface{})
-
-	metadata := template.Metadata
-	totalPages := metadata.TotalElements
-	currPage := metadata.Number
-
-	// Iterate over all catalog results to find out matching catalog name
-	// provided in terraform configuration file
-	for i := range catalogItemsArray {
-		catalogItem := catalogItemsArray[i].(map[string]interface{})
-		name := catalogItem["name"].(string)
-		if name == catalogName {
-			return catalogItem["catalogItemId"].(string), nil
-		}
-	}
-	if currPage < totalPages {
-		return c.ReadCatalogItemByName(catalogName, currPage+1)
-	}
-	return "", fmt.Errorf("Catalog item, %s not found", catalogName)
+	return &template, nil
 }
 
 // GetBusinessGroupID retrieves business group id from business group name
