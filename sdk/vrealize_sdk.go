@@ -94,17 +94,18 @@ func (c *APIClient) ReadCatalogItemNameByID(catalogItemID string) (string, error
 // ReadCatalogItemByName to read id of catalog from vRA using catalog_name
 func (c *APIClient) ReadCatalogItemByName(catalogName string) (string, error) {
 
-	entitled, err := c.ReadCatalogItemsByPage(1)
+	// reading the first page to get the total number of pages
+	entitledCatalogItems, err := c.readCatalogItemsByPage(1)
 	if err != nil {
 		return "", err
 	}
 
-	for i := 1; i <= entitled.Metadata.TotalElements; i++ {
-		entitled1, err := c.ReadCatalogItemsByPage(i)
+	for i := 1; i <= entitledCatalogItems.Metadata.TotalPages; i++ {
+		entitledCatalogItemViews, err := c.readCatalogItemsByPage(i)
 		if err != nil {
 			return "", err
 		}
-		catalogItemsArray := entitled1.Content.([]interface{})
+		catalogItemsArray := entitledCatalogItemViews.Content.([]interface{})
 		for i := range catalogItemsArray {
 			catalogItem := catalogItemsArray[i].(map[string]interface{})
 			name := catalogItem["name"].(string)
@@ -118,7 +119,7 @@ func (c *APIClient) ReadCatalogItemByName(catalogName string) (string, error) {
 }
 
 // ReadCatalogItemsByPage return catalogItems by page
-func (c *APIClient) ReadCatalogItemsByPage(i int) (*EntitledCatalogItemViews, error) {
+func (c *APIClient) readCatalogItemsByPage(i int) (*EntitledCatalogItemViews, error) {
 	url := c.BuildEncodedURL(EntitledCatalogItemViewsAPI, map[string]string{
 		"page": strconv.Itoa(i)})
 	resp, respErr := c.Get(url, nil)
@@ -126,7 +127,6 @@ func (c *APIClient) ReadCatalogItemsByPage(i int) (*EntitledCatalogItemViews, er
 		return nil, respErr
 	}
 
-	log.Critical("the json response is %v ", string(resp.Body))
 	var template EntitledCatalogItemViews
 	unmarshallErr := utils.UnmarshalJSON(resp.Body, &template)
 	if unmarshallErr != nil {
