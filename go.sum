@@ -86,4 +86,5 @@ google.golang.org/genproto v0.0.0-20171002232614-f676e0f3ac63 h1:yNBw5bwywOTguAu
 google.golang.org/genproto v0.0.0-20171002232614-f676e0f3ac63/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
 google.golang.org/grpc v1.6.0 h1:vaySXtNtPrLJFCiET8QXtfBrqq16ynklmFGaZwLcd1M=
 google.golang.org/grpc v1.6.0/go.mod h1:yo6s7OP7yaDglbqo1J04qKzAhqBH6lvTonzMVmEdcZw=
+gopkg.in/jarcoal/httpmock.v1 v1.0.0-20170412085702-cf52904a3cf0 h1:wQvcxZY1FNzBQm8MA4aUNdK4nozflCum8cqis1bUOw4=
 gopkg.in/jarcoal/httpmock.v1 v1.0.0-20170412085702-cf52904a3cf0/go.mod h1:d3R+NllX3X5e0zlG1Rful3uLvsGC/Q3OHut5464DEQw=

@@ -3,7 +3,6 @@ package sdk
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
@@ -55,10 +54,10 @@ const (
 	Destroy                = "Destroy"
 )
 
-//GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
+// GetCatalogItemRequestTemplate - Call to retrieve a request template for a catalog item.
 func (c *APIClient) GetCatalogItemRequestTemplate(catalogItemID string) (*CatalogItemRequestTemplate, error) {
 
-	//Form a path to read catalog request template via REST call
+	// Form a path to read catalog request template via REST call
 	path := fmt.Sprintf(RequestTemplateAPI, catalogItemID)
 	url := c.BuildEncodedURL(path, nil)
 	resp, respErr := c.Get(url, nil)
@@ -94,59 +93,47 @@ func (c *APIClient) ReadCatalogItemNameByID(catalogItemID string) (string, error
 
 // ReadCatalogItemByName to read id of catalog from vRA using catalog_name
 func (c *APIClient) ReadCatalogItemByName(catalogName string) (string, error) {
-	var catalogItemID string
 
-	log.Info("readCatalogItemIdByName->catalog_name %v\n", catalogName)
+	// reading the first page to get the total number of pages
+	entitledCatalogItems, err := c.readCatalogItemsByPage(1)
+	if err != nil {
+		return "", err
+	}
 
-	//Set a call to read number of catalogs from vRA
-	path := fmt.Sprintf(EntitledCatalogItemViewsAPI)
+	for page := 1; page <= entitledCatalogItems.Metadata.TotalPages; page++ {
+		entitledCatalogItemViews, err := c.readCatalogItemsByPage(page)
+		if err != nil {
+			return "", err
+		}
+		catalogItemsArray := entitledCatalogItemViews.Content.([]interface{})
+		for i := range catalogItemsArray {
+			catalogItem := catalogItemsArray[i].(map[string]interface{})
+			name := catalogItem["name"].(string)
+			if name == catalogName {
+				return catalogItem["catalogItemId"].(string), nil
+			}
+		}
 
-	url := c.BuildEncodedURL(path, nil)
+	}
+	return "", fmt.Errorf("Catalog item, %s not found", catalogName)
+}
+
+// ReadCatalogItemsByPage return catalogItems by page
+func (c *APIClient) readCatalogItemsByPage(i int) (*EntitledCatalogItemViews, error) {
+	url := c.BuildEncodedURL(EntitledCatalogItemViewsAPI, map[string]string{
+		"page": strconv.Itoa(i)})
 	resp, respErr := c.Get(url, nil)
 	if respErr != nil || resp.StatusCode != 200 {
-		return "", respErr
+		return nil, respErr
 	}
 
 	var template EntitledCatalogItemViews
 	unmarshallErr := utils.UnmarshalJSON(resp.Body, &template)
 	if unmarshallErr != nil {
-		return "", unmarshallErr
+		return nil, unmarshallErr
 	}
 
-	var catalogItemNameArray []string
-	interfaceArray := template.Content.([]interface{})
-	catalogItemNameLen := len(catalogName)
-
-	//Iterate over all catalog results to find out matching catalog name
-	// provided in terraform configuration file
-	for i := range interfaceArray {
-		catalogItem := interfaceArray[i].(map[string]interface{})
-		if catalogItemNameLen <= len(catalogItem["name"].(string)) {
-			//If exact name matches then return respective catalog_id
-			//else if provided catalog matches as a substring in name then store it in array
-			if catalogName == catalogItem["name"].(string) {
-				return catalogItem["catalogItemId"].(string), nil
-			} else if catalogName == catalogItem["name"].(string)[0:catalogItemNameLen] {
-				catalogItemNameArray = append(catalogItemNameArray, catalogItem["name"].(string))
-			}
-		}
-	}
-
-	// If multiple catalog items are present with provided catalog_name
-	// then raise an error and show all names of catalog items with similar name
-	if len(catalogItemNameArray) > 0 {
-		for index := range catalogItemNameArray {
-			catalogItemNameArray[index] = strconv.Itoa(index+1) + " " + catalogItemNameArray[index]
-		}
-		errorMessage := strings.Join(catalogItemNameArray, "\n")
-		punctuation := "is"
-		if len(catalogItemNameArray) > 1 {
-			punctuation = "are"
-		}
-		return "", fmt.Errorf("There %s total %d catalog(s) present with same name.\n%s\n"+
-			"Please select from above.", punctuation, len(catalogItemNameArray), errorMessage)
-	}
-	return catalogItemID, nil
+	return &template, nil
 }
 
 // GetBusinessGroupID retrieves business group id from business group name
@@ -181,7 +168,7 @@ func (c *APIClient) GetBusinessGroupID(businessGroupName string, tenant string) 
 	return "", fmt.Errorf("No business group found with name: %s ", businessGroupName)
 }
 
-//GetRequestStatus - To read request status of resource
+// GetRequestStatus - To read request status of resource
 // which is used to show information to user post create call.
 func (c *APIClient) GetRequestStatus(requestID string) (*RequestStatusView, error) {
 	//Form a URL to read request status
@@ -217,7 +204,7 @@ func (c *APIClient) GetRequestResourceView(catalogRequestID string) (*RequestRes
 	return &response, nil
 }
 
-//RequestCatalogItem - Make a catalog request.
+// RequestCatalogItem - Make a catalog request.
 func (c *APIClient) RequestCatalogItem(requestTemplate *CatalogItemRequestTemplate) (*CatalogRequest, error) {
 	//Form a path to set a REST call to create a machine
 	path := fmt.Sprintf(EntitledCatalogItems+"/"+"%s"+

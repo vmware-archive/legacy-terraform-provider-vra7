@@ -77,8 +77,8 @@ func TestReadCatalogItemByName(t *testing.T) {
 	httpmock.ActivateNonDefault(client.Client)
 	defer httpmock.DeactivateAndReset()
 
-	path := fmt.Sprintf(EntitledCatalogItemViewsAPI)
-	url := client.BuildEncodedURL(path, nil)
+	url := client.BuildEncodedURL(EntitledCatalogItemViewsAPI, map[string]string{
+		"page": "1"})
 
 	httpmock.RegisterResponder("GET", url,
 		httpmock.NewStringResponder(200, entitledCatalogItemViewsResponse))
