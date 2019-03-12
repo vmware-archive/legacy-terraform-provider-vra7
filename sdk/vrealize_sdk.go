@@ -100,8 +100,8 @@ func (c *APIClient) ReadCatalogItemByName(catalogName string) (string, error) {
 		return "", err
 	}
 
-	for i := 1; i <= entitledCatalogItems.Metadata.TotalPages; i++ {
-		entitledCatalogItemViews, err := c.readCatalogItemsByPage(i)
+	for page := 1; page <= entitledCatalogItems.Metadata.TotalPages; page++ {
+		entitledCatalogItemViews, err := c.readCatalogItemsByPage(page)
 		if err != nil {
 			return "", err
 		}
