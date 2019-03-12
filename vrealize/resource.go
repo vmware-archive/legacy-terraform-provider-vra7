@@ -177,10 +177,6 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 		return fmt.Errorf("Error while reading resource actions for the request %v: %v  ", catalogItemRequestID, err.Error())
 	}
 
-	if d.HasChange(utils.DeploymentConfiguration) {
-
-	}
-
 	// If any change made in resource_configuration.
 	if d.HasChange(utils.ResourceConfiguration) {
 		for _, resources := range resourceActions.Content {
