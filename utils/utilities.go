@@ -10,8 +10,10 @@ import (
 
 // terraform provider constants
 const (
-	CatalogName             = "catalog_name"
-	CatalogID               = "catalog_id"
+	CatalogItemName         = "catalog_item_name"
+	CatalogItemID           = "catalog_item_id"
+	Description             = "description"
+	Reasons                 = "reasons"
 	BusinessGroupID         = "businessgroup_id"
 	BusinessGroupName       = "businessgroup_name"
 	WaitTimeout             = "wait_timeout"

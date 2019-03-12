@@ -30,6 +30,8 @@ var (
 type ProviderSchema struct {
 	CatalogItemName         string
 	CatalogItemID           string
+	Description             string
+	Reasons                 string
 	BusinessGroupID         string
 	BusinessGroupName       string
 	WaitTimeout             int
@@ -37,7 +39,6 @@ type ProviderSchema struct {
 	FailedMessage           string
 	DeploymentConfiguration map[string]interface{}
 	ResourceConfiguration   map[string]interface{}
-	CatalogConfiguration    map[string]interface{}
 }
 
 // byLength type to sort component name list by it's name length
@@ -70,8 +71,11 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		return validityErr
 	}
 
-	for field1 := range p.CatalogConfiguration {
-		requestTemplate.Data[field1] = p.CatalogConfiguration[field1]
+	requestTemplate.Description = p.Description
+	requestTemplate.Reasons = p.Reasons
+
+	for field1 := range p.DeploymentConfiguration {
+		requestTemplate.Data[field1] = p.DeploymentConfiguration[field1]
 	}
 
 	// Get all component names in the blueprint corresponding to the catalog item.
@@ -109,20 +113,6 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 					configValue)
 				break
 			}
-		}
-	}
-
-	//update template with deployment level config
-	// limit to description and reasons as other things could get us into trouble
-	for depField, depValue := range p.DeploymentConfiguration {
-		fieldstr := fmt.Sprintf("%s", depField)
-		switch fieldstr {
-		case "description":
-			requestTemplate.Description = depValue.(string)
-		case "reasons":
-			requestTemplate.Reasons = depValue.(string)
-		default:
-			log.Info("unknown option [%s] with value [%s] ignoring\n", depField, depValue)
 		}
 	}
 
@@ -469,15 +459,15 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 		log.Error(CatalogItemIDNameNotMatchingErr, p.CatalogItemName, p.CatalogItemID)
 		return nil, fmt.Errorf(CatalogItemIDNameNotMatchingErr, p.CatalogItemName, p.CatalogItemID)
 	} else if len(p.CatalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		d.Set(utils.CatalogID, p.CatalogItemID)
-		d.Set(utils.CatalogName, catalogItemNameFromID)
+		d.Set(utils.CatalogItemID, p.CatalogItemID)
+		d.Set(utils.CatalogItemName, catalogItemNameFromID)
 	} else if len(p.CatalogItemName) > 0 { // else if name is provided, use the id fetched from the name
-		d.Set(utils.CatalogID, catalogItemIDFromName)
-		d.Set(utils.CatalogName, p.CatalogItemName)
+		d.Set(utils.CatalogItemID, catalogItemIDFromName)
+		d.Set(utils.CatalogItemName, p.CatalogItemName)
 	}
 
 	// update the catalogItemID var with the updated id
-	p.CatalogItemID = d.Get(utils.CatalogID).(string)
+	p.CatalogItemID = d.Get(utils.CatalogItemID).(string)
 
 	// Get request template for catalog item.
 	requestTemplate, err := vraClient.GetCatalogItemRequestTemplate(p.CatalogItemID)
@@ -486,8 +476,8 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 	}
 	log.Info("The request template data corresponding to the catalog item %v is: \n %v\n", p.CatalogItemID, requestTemplate.Data)
 
-	for field1 := range p.CatalogConfiguration {
-		requestTemplate.Data[field1] = p.CatalogConfiguration[field1]
+	for field1 := range p.DeploymentConfiguration {
+		requestTemplate.Data[field1] = p.DeploymentConfiguration[field1]
 
 	}
 	// get the business group id from name
@@ -553,15 +543,16 @@ func readProviderConfiguration(d *schema.ResourceData) *ProviderSchema {
 
 	log.Info("Reading the provider configuration data.....")
 	providerSchema := ProviderSchema{
-		CatalogItemName:         strings.TrimSpace(d.Get(utils.CatalogName).(string)),
-		CatalogItemID:           strings.TrimSpace(d.Get(utils.CatalogID).(string)),
+		CatalogItemName:         strings.TrimSpace(d.Get(utils.CatalogItemName).(string)),
+		CatalogItemID:           strings.TrimSpace(d.Get(utils.CatalogItemID).(string)),
+		Description:             strings.TrimSpace(d.Get(utils.Description).(string)),
+		Reasons:                 strings.TrimSpace(d.Get(utils.Reasons).(string)),
 		BusinessGroupName:       strings.TrimSpace(d.Get(utils.BusinessGroupName).(string)),
 		BusinessGroupID:         strings.TrimSpace(d.Get(utils.BusinessGroupID).(string)),
 		WaitTimeout:             d.Get(utils.WaitTimeout).(int) * 60,
 		FailedMessage:           strings.TrimSpace(d.Get(utils.FailedMessage).(string)),
 		ResourceConfiguration:   d.Get(utils.ResourceConfiguration).(map[string]interface{}),
 		DeploymentConfiguration: d.Get(utils.DeploymentConfiguration).(map[string]interface{}),
-		CatalogConfiguration:    d.Get(utils.CatalogConfiguration).(map[string]interface{}),
 	}
 
 	log.Info("The values provided in the TF config file is: \n %v ", providerSchema)
