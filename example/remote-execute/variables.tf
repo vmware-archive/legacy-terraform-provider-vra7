@@ -3,7 +3,7 @@ variable password {}
 variable tenant {}
 variable host {}
 
-variable "catalog_name" {}
+variable "catalog_item_name" {}
 variable "count" {}
 
 variable "cpu" {

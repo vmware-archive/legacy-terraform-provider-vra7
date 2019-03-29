@@ -161,21 +161,25 @@ The resource block contains mandatory and optional fields as follows:
 
 Mandatory:
 
-One of catalog\_name or catalog\_id must be specified in the resource configuration.
+One of catalog\_item\_name or catalog\_item\_id must be specified in the resource configuration.
 
-* **catalog_name** - *catalog_name is a field which contains valid catalog name from your vRA*
+* **catalog_item_name** - *catalog_item_name is a field which contains valid catalog item name from your vRA*
 
-* **catalog_id** - *catalog_id is a field which contains a valid catalog id from your vRA.* 
+* **catalog_item_id** - *catalog_item_id is a field which contains a valid catalog item id from your vRA.* 
 
 Optional:
 
+* **description** - *This is an optional field. You can specify a description for your deployment*
+
+* **reasons** - *This is an optional field. You can specify the reasons for this deployment*
+
 * **businessgroup_id** - *This is an optional field. You can specify a different Business Group ID from what provided by default in the template reques, provided that your account is allowed to do it*
 
-* **catalog_configuration** - *This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.*
+* **businessgroup_name** - *This is an optional field. You can specify a different Business Group name from what provided by default in the template request, provided that your account is allowed to do it*
 
 * **count** - *This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.*
 
-* **deployment_configuration** - *This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.*
+* **deployment_configuration** - *This is an optional field. It can be used to specify deployment level properties like _leaseDays, _number_of_instances or any custom properties of the deployment. Key is any field name of catalog and value is any valid user input to the respective field.*
 
 * **resource_configuration** - *This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.*
 
@@ -185,20 +189,18 @@ Optional:
 Example 1
 
 ```
-resource "vra7_resource" "example_machine1" {
-  catalog_name = "CentOS 6.3"
+resource "vra7_deployment" "example_machine1" {
+  catalog_item_name = "CentOS 6.3"
+  reasons = "I have some"
+  description  = "deployment via terraform"
    resource_configuration = {
          Linux.cpu = "1"
          Windows2008R2SP1.cpu =  "2"
          Windows2012.cpu =  "4"
          Windows2016.cpu =  "2"
      }
-     catalog_configuration = {
-         _leaseDays = "5"
-     }
      deployment_configuration = {
-         reasons      = "I have some"
-         description  = "deployment via terraform"
+         _leaseDays = "5"
      }
      count = 3
 }
@@ -208,8 +210,8 @@ resource "vra7_resource" "example_machine1" {
 Example 2
 
 ```
-resource "vra7_resource" "example_machine2" {
-  catalog_id = "e5dd4fba7f96239286be45ed"
+resource "vra7_deployment" "example_machine2" {
+  catalog_item_id = "e5dd4fba7f96239286be45ed"
    resource_configuration = {
          Linux.cpu = "1"
          Windows2008.cpu =  "2"
