@@ -132,7 +132,7 @@ For example, in our case machine blueprint, software blueprint, complex blueprin
 
 **Syntax:**
 ```
-resource "vra7_resource" "<resource_name1>" {
+resource "vra7_deployment" "<resource_name1>" {
 }
 ```
 
@@ -157,7 +157,7 @@ One of catalog_item_name or catalog_item_id must be specified in the resource co
 
 **Example 1:**
 ```
-resource "vra7_resource" "example_machine1" {
+resource "vra7_deployment" "example_machine1" {
   catalog_item_name = "CentOS 6.3"
   reasons      = "I have some"
   description  = "deployment via terraform"
@@ -176,7 +176,7 @@ resource "vra7_resource" "example_machine1" {
 
 **Example 2:**
 ```
-resource "vra7_resource" "example_machine2" {
+resource "vra7_deployment" "example_machine2" {
   catalog_item_id = "e5dd4fba7f96239286be45ed"
    resource_configuration = {
          Linux.cpu = "1"
