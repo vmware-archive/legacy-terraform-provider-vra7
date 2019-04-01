@@ -132,7 +132,7 @@ For example, in our case machine blueprint, software blueprint, complex blueprin
 
 **Syntax:**
 ```
-resource "vra7_resource" "<resource_name1>" {
+resource "vra7_deployment" "<resource_name1>" {
 }
 ```
 
@@ -140,35 +140,35 @@ The resource block contains mandatory and optional fields.
 
 **Mandatory:**
 
-One of catalog_name or catalog_id must be specified in the resource configuration.
-* `catalog_name` - catalog_name is a field which contains valid catalog name from your vRA
-* `catalog_id` - catalog_id is a field which contains a valid catalog id from your vRA
+One of catalog_item_name or catalog_item_id must be specified in the resource configuration.
+* `catalog_item_name` - catalog_item_name is a field which contains valid catalog item name from your vRA
+* `catalog_item_id` - catalog_item_id is a field which contains a valid catalog item id from your vRA
 
 **Optional:**
+* `description` - This is an optional field. You can specify a description for your deployment.
+* `reasons` - This is an optional field. You can specify the reasons for this deployment.
 * `businessgroup_id` - This is an optional field. You can specify a different Business Group ID from what provided by default in the template request, provided that your account is allowed to do it.
-* `catalog_configuration` - This is an optional field. If catalog properties have default values or no mandatory user input required for catalog service then you can skip this field from the terraform configuration file. This field contains user inputs to catalog services. Value of this field is a key value pair. Key is any field name of catalog and value is any valid user input to the respective field.
+* `businessgroup_name` - This is an optional field. You can specify a different Business Group name from what provided by default in the template request, provided that your account is allowed to do it.
 * `count` - This field is used to create replicas of resources. If count is not provided then it will be considered as 1 by default.
-* `deployment_configuration` - This is an optional field. Can only be used to  specify the description or reasons field at the deployment level.  Key is any field name of catalog and value is any valid user input to the respective field.
+* `deployment_configuration` - This is an optional field. It can be used to specify deployment level properties like _leaseDays, _number_of_instances or any custom properties of the deployment. Key is any field name of catalog item and value is any valid user input to the respective field..
 * `resource_configuration` - This is an optional field. If blueprint properties have default values or no mandatory property value is required then you can skip this field from terraform configuration file. This field contains user inputs to catalog services. Value of this field is in key value pair. Key is service.field_name and value is any valid user input to the respective field.
 * `wait_timeout` - This is an optional field with a default value of 15. It defines the time to wait (in minutes) for a resource operation to complete successfully.
 
 
 **Example 1:**
 ```
-resource "vra7_resource" "example_machine1" {
-  catalog_name = "CentOS 6.3"
+resource "vra7_deployment" "example_machine1" {
+  catalog_item_name = "CentOS 6.3"
+  reasons      = "I have some"
+  description  = "deployment via terraform"
    resource_configuration = {
          Linux.cpu = "1"
          Windows2008R2SP1.cpu =  "2"
          Windows2012.cpu =  "4"
          Windows2016.cpu =  "2"
      }
-     catalog_configuration = {
-         _leaseDays = "5"
-     }
      deployment_configuration = {
-         reasons      = "I have some"
-         description  = "deployment via terraform"
+         _leaseDays = "5"
      }
      count = 3
 }
@@ -176,8 +176,8 @@ resource "vra7_resource" "example_machine1" {
 
 **Example 2:**
 ```
-resource "vra7_resource" "example_machine2" {
-  catalog_id = "e5dd4fba7f96239286be45ed"
+resource "vra7_deployment" "example_machine2" {
+  catalog_item_id = "e5dd4fba7f96239286be45ed"
    resource_configuration = {
          Linux.cpu = "1"
          Windows2008.cpu =  "2"
@@ -201,6 +201,29 @@ These are the Terraform commands that can be used for the vRA plugin:
 * `terraform destroy` - destroy command will destroy all the  resources present in terraform configuration file.
 
 Navigate to the location where `main.tf` and binary are placed and use the above commands as needed.
+
+# Scripts
+
+**update_resource_state.sh**
+
+There are few changes in the way the terraform config file is written.
+1. The resource name is renamed to vra7_deployment from vra7_resource.
+2. catalog_name is renamed to catalog_item_name and catalog_id is renamed to catalog_item_id.
+3. General properties of deployment like description and reasons are to be specified at the resource level map instead of deployment_configuration.
+4. catalog_configuration map is removed.
+5. Custom/optional properties of deployment are to be specified in deployment_configuration instead of catalog_configuration.
+
+These changes in the config file will lead to inconsistency in the `terraform.tfstate` file of the existing resources provisioned using terraform. 
+The existing state files can be converted to the new format using the script, `update_resource_state.sh` under the scripts folder. 
+
+Note: This script will only convert the state file. The changes to the config file(.tf file) still needs to be done manually.
+
+## How to use the script
+
+1. Copy the script, `script/update_resource_state.sh` in the same directory as your terraform.tfstate file.
+2. Change the permission of the script, for example `chmod 0700 update_resource_state.sh`.
+3. Run the script, `./update_resource_state.sh`.
+4. The terraform.tfstate will be updated to the new format and a back-up of the old file is saved as terraform.tfstate_back
 
 # Contributing
 The `terraform-provider-vra7` project team welcomes contributions from the community. Before you start working with `terraform-provider-vra7`, please read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All contributions to this repository must be signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on as an open-source patch. For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).

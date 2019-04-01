@@ -68,11 +68,21 @@ func ResourceMachine() *schema.Resource {
 //and replace the values with user defined values added in .tf file.
 func resourceSchema() map[string]*schema.Schema {
 	return map[string]*schema.Schema{
-		utils.CatalogName: {
+		utils.CatalogItemName: {
 			Type:     schema.TypeString,
 			Optional: true,
 		},
-		utils.CatalogID: {
+		utils.CatalogItemID: {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		utils.Description: {
+			Type:     schema.TypeString,
+			Computed: true,
+			Optional: true,
+		},
+		utils.Reasons: {
 			Type:     schema.TypeString,
 			Computed: true,
 			Optional: true,
@@ -122,15 +132,6 @@ func resourceSchema() map[string]*schema.Schema {
 				Elem:     schema.TypeString,
 			},
 		},
-		utils.CatalogConfiguration: {
-			Type:     schema.TypeMap,
-			Optional: true,
-			Elem: &schema.Schema{
-				Type:     schema.TypeMap,
-				Optional: true,
-				Elem:     schema.TypeString,
-			},
-		},
 	}
 }
 
@@ -160,6 +161,6 @@ func providerConfig(r *schema.ResourceData) (interface{}, error) {
 //Function use - set machine resource details based on machine type
 func providerResources() map[string]*schema.Resource {
 	return map[string]*schema.Resource{
-		"vra7_resource": ResourceMachine(),
+		"vra7_deployment": ResourceMachine(),
 	}
 }

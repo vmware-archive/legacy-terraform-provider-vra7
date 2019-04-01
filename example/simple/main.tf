@@ -5,9 +5,9 @@ provider  "vra7" {
     host = "${var.host}"
 }
 
-resource "vra7_resource" "machine" {
+resource "vra7_deployment" "machine" {
   count            = 1
-  catalog_name = "CentOS 7.0 x64"
+  catalog_item_name = "CentOS 7.0 x64"
   resource_configuration = {
     Linux.cpu = "2"
   }

@@ -6,9 +6,9 @@ provider  "vra7" {
 }
 
 # Catalog "multi_machine_catalog" contains Linux, Windows and http (apache) designs.
-resource "vra7_resource" "resource_1" {
+resource "vra7_deployment" "resource_1" {
   count            = 1
-  catalog_name = "multi_machine_catalog"
+  catalog_item_name = "multi_machine_catalog"
   resource_configuration = {
     Windows.cpu = "2"                //Windows Machine CPU
     Linux.cpu = "2"                  //Linux Machine CPU

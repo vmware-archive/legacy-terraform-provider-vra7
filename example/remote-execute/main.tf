@@ -5,12 +5,14 @@ provider "vra7" {
   host     = "${var.host}"
 }
 
-resource "vra7_resource" "vm" {
-  catalog_name = "${var.catalog_name}"
+resource "vra7_deployment" "vm" {
+  catalog_item_name = "${var.catalog_item_name}"
+  reasons     = "${var.description}"
+  description = "${var.description}"
 
   count = "${var.count}"
 
-  catalog_configuration = {
+  deployment_configuration = {
     VirtualMachine.Disk1.Size = "${var.extra_disk}"
   }
 
@@ -20,11 +22,6 @@ resource "vra7_resource" "vm" {
     Machine.memory      = "${var.ram}"
 
     Machine.ip_address = ""
-  }
-
-  deployment_configuration = {
-    reasons     = "${var.description}"
-    description = "${var.description}"
   }
 
   wait_timeout = "${var.wait_timeout}"
