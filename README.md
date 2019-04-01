@@ -202,6 +202,29 @@ These are the Terraform commands that can be used for the vRA plugin:
 
 Navigate to the location where `main.tf` and binary are placed and use the above commands as needed.
 
+# Scripts
+
+**update_resource_state.sh**
+
+There are few changes in the way the terraform config file is written.
+1. The resource name is renamed to vra7_deployment from vra7_resource.
+2. catalog_name is renamed to catalog_item_name and catalog_id is renamed to catalog_item_id.
+3. General properties of deployment like description and reasons are to be specified at the resource level map instead of deployment_configuration.
+4. catalog_configuration map is removed.
+5. Custom/optional properties of deployment are to be specified in deployment_configuration instead of catalog_configuration.
+
+These changes in the config file will lead to inconsistency in the `terraform.tfstate` file of the existing resources provisioned using terraform. 
+The existing state files can be converted to the new format using the script, `update_resource_state.sh` under the scripts folder. 
+
+Note: This script will only convert the state file. The changes to the config file(.tf file) still needs to be done manually.
+
+## How to use the script
+
+1. Copy the script, `script/update_resource_state.sh` in the same directory as your terraform.tfstate file.
+2. Change the permission of the script, for example `chmod 0700 update_resource_state.sh`.
+3. Run the script, `./update_resource_state.sh`.
+4. The terraform.tfstate will be updated to the new format and a back-up of the old file is saved as terraform.tfstate_back
+
 # Contributing
 The `terraform-provider-vra7` project team welcomes contributions from the community. Before you start working with `terraform-provider-vra7`, please read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All contributions to this repository must be signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on as an open-source patch. For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
