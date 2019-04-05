@@ -38,7 +38,9 @@ func (c *APIClient) DoRequest(req *APIRequest, login bool) (*APIResponse, error)
 		return nil, err
 	}
 	if !login {
-		c.Authenticate()
+		if c.BearerToken == "" {
+			c.Authenticate()
+		}
 		r.Header.Add(AuthorizationHeader, c.BearerToken)
 	}
 	r.Header.Add(ConnectionHeader, CloseConnection)
