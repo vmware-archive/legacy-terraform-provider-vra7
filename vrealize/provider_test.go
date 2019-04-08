@@ -8,8 +8,8 @@ import (
 	"github.com/vmware/terraform-provider-vra7/utils"
 	"gopkg.in/jarcoal/httpmock.v1"
 	"os"
-	"testing"
 	"strconv"
+	"testing"
 )
 
 var (
