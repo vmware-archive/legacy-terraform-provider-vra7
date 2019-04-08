@@ -25,28 +25,32 @@ func providerSchema() map[string]*schema.Schema {
 		"username": {
 			Type:        schema.TypeString,
 			Required:    true,
+			DefaultFunc: schema.EnvDefaultFunc("VRA7_USERNAME", nil),
 			Description: "Tenant administrator username.",
 		},
 		"password": {
 			Type:        schema.TypeString,
 			Required:    true,
+			DefaultFunc: schema.EnvDefaultFunc("VRA7_PASSWORD", nil),
 			Description: "Tenant administrator password.",
 		},
 		"tenant": {
-			Type:     schema.TypeString,
-			Required: true,
+			Type:        schema.TypeString,
+			Required:    true,
+			DefaultFunc: schema.EnvDefaultFunc("VRA7_TENANT", nil),
 			Description: "Specifies the tenant URL token determined by the system administrator" +
 				"when creating the tenant, for example, support.",
 		},
 		"host": {
-			Type:     schema.TypeString,
-			Required: true,
+			Type:        schema.TypeString,
+			Required:    true,
+			DefaultFunc: schema.EnvDefaultFunc("VRA7_HOST", nil),
 			Description: "host name.domain name of the vRealize Automation server, " +
 				"for example, mycompany.mktg.mydomain.com.",
 		},
 		"insecure": {
 			Type:        schema.TypeBool,
-			Default:     false,
+			DefaultFunc: schema.EnvDefaultFunc("VRA7_INSECURE", nil),
 			Optional:    true,
 			Description: "Specify whether to validate TLS certificates.",
 		},

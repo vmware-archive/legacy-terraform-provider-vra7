@@ -2,6 +2,7 @@ VERSION=0.0.1
 NAME=terraform-provider-vra7
 
 SRC = $(shell find . -type f -name '*.go' -not -path "./vendor/*")
+TEST?=$(shell go list ./... |grep -v 'vendor')
 
 .PHONY: all build check clean dev fmt simplify race release
 
@@ -28,6 +29,10 @@ clean:
 
 dev:
 	GOARCH=$$(go env GOARCH) GOOS=$$(go env GOOS) go install
+
+testacc:
+	echo "TEST: " $(TEST)
+	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 240m
 
 fmt:
 	@gofmt -l -w $(SRC)

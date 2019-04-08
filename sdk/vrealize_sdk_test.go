@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/vmware/terraform-provider-vra7/utils"
@@ -9,17 +11,18 @@ import (
 )
 
 var (
-	client   APIClient
-	user     = "admin@myvra.local"
-	password = "pass!@#"
-	tenant   = "vsphere.local"
-	baseURL  = "http://localhost"
-	insecure = true
+	client       APIClient
+	mockUser     = os.Getenv("VRA7_USERNAME")
+	mockPassword = os.Getenv("VRA7_PASSWORD")
+	mockTenant   = os.Getenv("VRA7_TENANT")
+	mockBaseURL  = os.Getenv("VRA7_HOST")
+	mockInsecure = os.Getenv("VRA7_INSECURE")
 )
 
 func init() {
 	fmt.Println("init")
-	client = NewClient(user, password, tenant, baseURL, insecure)
+	insecureBool, _ := strconv.ParseBool(mockInsecure)
+	client = NewClient(mockUser, mockPassword, mockTenant, mockBaseURL, insecureBool)
 }
 
 func TestGetCatalogItemRequestTemplate(t *testing.T) {
@@ -96,12 +99,12 @@ func TestGetBusinessGroupID(t *testing.T) {
 	httpmock.ActivateNonDefault(client.Client)
 	defer httpmock.DeactivateAndReset()
 
-	path := Tenants + "/" + tenant + "/subtenants"
+	path := Tenants + "/" + mockTenant + "/subtenants"
 	url := client.BuildEncodedURL(path, nil)
 
 	httpmock.RegisterResponder("GET", url, httpmock.NewStringResponder(200, subTenantsResponse))
 
-	id, err := client.GetBusinessGroupID("Development", tenant)
+	id, err := client.GetBusinessGroupID("Development", mockTenant)
 	utils.AssertNilError(t, err)
 	utils.AssertEqualsString(t, "b2470b94-cbca-43db-be37-803cca7b0f1a", id)
 }

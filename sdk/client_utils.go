@@ -120,6 +120,10 @@ func FromHTTPRespToAPIResp(resp *http.Response) (*APIResponse, error) {
 	apiResp.Headers = resp.Header
 	apiResp.Status = resp.Status
 	apiResp.StatusCode = resp.StatusCode
+	url, _ := resp.Location()
+	if url != nil {
+		apiResp.Location = url.String()
+	}
 	return apiResp, nil
 }
 

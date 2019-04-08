@@ -12,6 +12,7 @@ type APIResponse struct {
 	Body       []byte
 	Status     string
 	StatusCode int
+	Location   string
 }
 
 //APIRequest struct

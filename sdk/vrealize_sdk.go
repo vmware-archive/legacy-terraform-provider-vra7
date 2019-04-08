@@ -3,6 +3,7 @@ package sdk
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
@@ -262,14 +263,19 @@ func (c *APIClient) GetResourceActionTemplate(resourceID, actionID string) (*Res
 }
 
 // PostResourceAction updates the resource
-func (c *APIClient) PostResourceAction(resourceID, actionID string, resourceActionTemplate *ResourceActionTemplate) error {
+func (c *APIClient) PostResourceAction(resourceID, actionID string, resourceActionTemplate *ResourceActionTemplate) (string, error) {
 
 	postActionTemplatePath := fmt.Sprintf(PostActionTemplateAPI, resourceID, actionID)
 	buffer, _ := utils.MarshalToJSON(resourceActionTemplate)
 	url := c.BuildEncodedURL(postActionTemplatePath, nil)
 	resp, respErr := c.Post(url, buffer, nil)
 	if respErr != nil || resp.StatusCode != 201 {
-		return respErr
+		return "", respErr
 	}
-	return nil
+
+	requestURL := resp.Location
+	i := strings.LastIndex(requestURL, "/")
+	requestID := requestURL[i+1 : len(requestURL)]
+
+	return requestID, nil
 }
