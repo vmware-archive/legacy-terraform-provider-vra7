@@ -1,4 +1,4 @@
-package vrealize
+package vra7
 
 var (
 	validAuthResponse = `{  

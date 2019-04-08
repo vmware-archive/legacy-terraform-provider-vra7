@@ -20,7 +20,7 @@ check:
 		test -z "$$(golint $${d} | tee /dev/stderr)" || ret=1; \
 		done; exit $$ret
 	@go tool vet main.go
-	@go tool vet vrealize
+	@go tool vet vra7
 	go test ./...
 
 clean:

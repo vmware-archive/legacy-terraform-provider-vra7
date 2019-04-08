@@ -11,7 +11,7 @@ func main() {
 	utils.InitLog()
 	opts := plugin.ServeOpts{
 		ProviderFunc: func() terraform.ResourceProvider {
-			return vrealize.Provider()
+			return vra7.Provider()
 		},
 	}
 
