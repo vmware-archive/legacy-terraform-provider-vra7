@@ -125,10 +125,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 		log.Errorf("Resource Machine Request Failed: %v", err)
 		return fmt.Errorf("Resource Machine Request Failed: %v", err)
 	}
-	//Set request ID
 	d.SetId(catalogRequest.ID)
-	//Set request status
-	//d.Set(utils.RequestStatus, sdk.Submitted)
 	_, err = waitForRequestCompletion(d, meta, catalogRequest.ID)
 	if err != nil {
 		return err
@@ -262,7 +259,12 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	catalogItemRequestID := d.Id()
 
 	requestResourceView, errTemplate := vraClient.GetRequestResourceView(catalogItemRequestID)
-	if errTemplate != nil {
+	if requestResourceView != nil && len(requestResourceView.Content) == 0 {
+		//If resource does not exists then unset the resource ID from state file
+		d.SetId("")
+		return fmt.Errorf("The resource cannot be found")
+	}
+	if errTemplate != nil || len(requestResourceView.Content) == 0 {
 		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
 	}
 
