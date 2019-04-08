@@ -3,25 +3,22 @@ package vrealize
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform/terraform"
+
+	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/vmware/terraform-provider-vra7/sdk"
 	"github.com/vmware/terraform-provider-vra7/utils"
 )
 
-var (
-	mockUser     = "admin@myvra.local"
-	mockPassword = "pass!@#"
-	mockTenant   = "vsphere.local"
-	mockBaseURL  = "http://localhost"
-	mockInsecure = true
-)
-
 func init() {
 	fmt.Println("init")
-	client = sdk.NewClient(mockUser, mockPassword, mockTenant, mockBaseURL, mockInsecure)
+	insecureBool, _ := strconv.ParseBool(mockInsecure)
+	client = sdk.NewClient(mockUser, mockPassword, mockTenant, mockBaseURL, insecureBool)
 }
 
 func TestConfigValidityFunction(t *testing.T) {
@@ -91,4 +88,123 @@ func GetMockRequestTemplate() *sdk.CatalogItemRequestTemplate {
 
 	return &mockRequestTemplateStruct
 
+}
+func TestAccVra7Deployment_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckVra7DeploymentConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckVra7DeploymentExists("vra7_deployment.my_vra7_deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "description", "Test deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "reasons", "Testing the vRA 7 Terraform plugin"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "businessgroup_name", "Development"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.%", "2"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration._leaseDays", "15"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.deployment_property", "custom deployment property"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.%", "3"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.cpu", "1"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.memory", "2048"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.machine_property", "machine custom property"),
+				),
+			},
+			{
+				Config: testAccCheckVra7DeploymentUpdateConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckVra7DeploymentExists("vra7_deployment.my_vra7_deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "description", "Test deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "reasons", "Testing the vRA 7 Terraform plugin"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "businessgroup_name", "Development"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.%", "2"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration._leaseDays", "15"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.deployment_property", "updated custom deployment property"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.%", "3"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.cpu", "1"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.memory", "1024"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.machine_property", "updated machine custom property"),
+				),
+			},
+		},
+	})
+}
+
+func testAccCheckVra7DeploymentExists(n string) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		rs, ok := s.RootModule().Resources[n]
+		if !ok {
+			return fmt.Errorf("Not found: %s", n)
+		}
+
+		if rs.Primary.ID == "" {
+			return fmt.Errorf("No resource request ID is set")
+		}
+
+		return nil
+	}
+}
+
+func testAccCheckVra7DeploymentUpdateConfig() string {
+	return fmt.Sprintf(`
+resource "vra7_deployment" "my_vra7_deployment" {
+count = 1
+catalog_item_name = "Basic Single Machine"
+description = "Test deployment"
+reasons = "Testing the vRA 7 Terraform plugin"
+
+deployment_configuration = {
+	_leaseDays = "15"
+	deployment_property = "updated custom deployment property"
+}
+resource_configuration = {
+	vSphereVM1.cpu = 1
+	vSphereVM1.memory = 1024
+	vSphereVM1.machine_property = "updated machine custom property"
+}
+wait_timeout = 20
+businessgroup_name = "Development"
+}`)
+}
+
+func testAccCheckVra7DeploymentConfig() string {
+	return fmt.Sprintf(`
+resource "vra7_deployment" "my_vra7_deployment" {
+count = 1
+catalog_item_name = "Basic Single Machine"
+description = "Test deployment"
+reasons = "Testing the vRA 7 Terraform plugin"
+
+deployment_configuration = {
+	_leaseDays = "15"
+	deployment_property = "custom deployment property"
+}
+resource_configuration = {
+	vSphereVM1.cpu = 1
+	vSphereVM1.memory = 2048
+	vSphereVM1.machine_property = "machine custom property"
+}
+wait_timeout = 20
+businessgroup_name = "Development"
+}`)
 }

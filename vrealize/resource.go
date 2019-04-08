@@ -128,8 +128,12 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	//Set request ID
 	d.SetId(catalogRequest.ID)
 	//Set request status
-	d.Set(utils.RequestStatus, sdk.Submitted)
-	return waitForRequestCompletion(d, meta)
+	//d.Set(utils.RequestStatus, sdk.Submitted)
+	_, err = waitForRequestCompletion(d, meta, catalogRequest.ID)
+	if err != nil {
+		return err
+	}
+	return readResource(d, meta)
 }
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
@@ -223,13 +227,21 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 								}
 							}
 						}
+						oldData, _ := d.GetChange(utils.ResourceConfiguration)
 						// If template value got changed then set post call and update resource child
 						if configChanged != false {
-							err := vraClient.PostResourceAction(resources.ID, reconfigureActionID, resourceActionTemplate)
+							requestURL, err := vraClient.PostResourceAction(resources.ID, reconfigureActionID, resourceActionTemplate)
 							if err != nil {
-								oldData, _ := d.GetChange(utils.ResourceConfiguration)
 								d.Set(utils.ResourceConfiguration, oldData)
 								log.Errorf("The update request failed with error: %v ", err)
+								return err
+							}
+							status, err := waitForRequestCompletion(d, meta, requestURL)
+							if err != nil {
+								// if the update request fails, go back to the old state and return the error
+								if status == sdk.Failed {
+									d.Set(utils.ResourceConfiguration, oldData)
+								}
 								return err
 							}
 						}
@@ -238,7 +250,7 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
-	return waitForRequestCompletion(d, meta)
+	return readResource(d, meta)
 }
 
 // Terraform call - terraform refresh
@@ -248,24 +260,6 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
-
-	log.Info("Calling read resource to get the current resource status of the request: %v ", catalogItemRequestID)
-	// Get client handle
-	// Get requested status
-	resourceTemplate, errTemplate := vraClient.GetRequestStatus(catalogItemRequestID)
-
-	if errTemplate != nil {
-		log.Errorf("Resource view failed to load:  %v", errTemplate)
-		return fmt.Errorf("Resource view failed to load:  %v", errTemplate)
-	}
-
-	// Update resource request status in state file
-	d.Set(utils.RequestStatus, resourceTemplate.Phase)
-	// If request is failed then set failed message in state file
-	if resourceTemplate.Phase == sdk.Failed {
-		log.Errorf(resourceTemplate.RequestCompletion.CompletionDetails)
-		d.Set(utils.FailedMessage, resourceTemplate.RequestCompletion.CompletionDetails)
-	}
 
 	requestResourceView, errTemplate := vraClient.GetRequestResourceView(catalogItemRequestID)
 	if errTemplate != nil {
@@ -320,6 +314,16 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 	}
 	log.Info("Calling delete resource for the request id %v ", catalogItemRequestID)
 
+	resourceView, err := vraClient.GetRequestResourceView(catalogItemRequestID)
+	if err != nil {
+		return fmt.Errorf("Resource view failed to load:  %v", err)
+	}
+	if len(resourceView.Content) == 0 {
+		//If resource gets deleted then unset the resource ID from state file
+		d.SetId("")
+		return fmt.Errorf("The resource cannot be found")
+	}
+
 	resourceActions, err := vraClient.GetResourceActions(catalogItemRequestID)
 	if err != nil {
 		return err
@@ -347,38 +351,18 @@ func deleteResource(d *schema.ResourceData, meta interface{}) error {
 				log.Errorf(DestroyActionTemplateError, deploymentName, err.Error())
 				return fmt.Errorf(DestroyActionTemplateError, deploymentName, err.Error())
 			}
-			err = vraClient.PostResourceAction(resources.ID, destroyActionID, resourceActionTemplate)
+			requestURL, err := vraClient.PostResourceAction(resources.ID, destroyActionID, resourceActionTemplate)
 			if err != nil {
 				log.Errorf("The destroy deployment request failed with error: %v ", err)
 				return err
 			}
+			status, err := waitForRequestCompletion(d, meta, requestURL)
+			if err != nil {
+				if status == sdk.Successful {
+					d.SetId("")
+				}
+			}
 		}
-	}
-
-	waitTimeout := d.Get(utils.WaitTimeout).(int) * 60
-	sleepFor := 30
-	for i := 0; i < waitTimeout/sleepFor; i++ {
-		time.Sleep(time.Duration(sleepFor) * time.Second)
-		log.Info("Checking to see if resource is deleted.")
-		resourceView, err := vraClient.GetRequestResourceView(catalogItemRequestID)
-		if err != nil {
-			return fmt.Errorf("Resource view failed to load:  %v", err)
-		}
-		// If resource create status is in_progress then skip delete call and throw an exception
-		// Note: vRA API should return error on destroy action if the request is in progress. Filed a bug
-		if d.Get(utils.RequestStatus).(string) == sdk.InProgress {
-			return fmt.Errorf("Machine cannot be deleted while request is in-progress state. Please try again later. \nRun terraform refresh to get the latest state of your request")
-		}
-
-		if len(resourceView.Content) == 0 {
-			//If resource got deleted then unset the resource ID from state file
-			d.SetId("")
-			break
-		}
-	}
-	if d.Id() != "" {
-		d.SetId("")
-		return fmt.Errorf("Resource still being deleted after %v minutes", d.Get(utils.WaitTimeout))
 	}
 	return nil
 }
@@ -504,7 +488,7 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 }
 
 // check the request status on apply and update
-func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
+func waitForRequestCompletion(d *schema.ResourceData, meta interface{}, requestID string) (string, error) {
 
 	waitTimeout := d.Get(utils.WaitTimeout).(int) * 60
 	sleepFor := 30
@@ -513,29 +497,26 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}) error {
 		log.Info("Waiting for %d seconds before checking request status.", sleepFor)
 		time.Sleep(time.Duration(sleepFor) * time.Second)
 
-		readResource(d, meta)
-
-		requestStatus = d.Get(utils.RequestStatus).(string)
-		log.Info("Checking to see if resource is created. Status: %s.", requestStatus)
-		if requestStatus == sdk.Successful {
-			log.Info("Resource creation SUCCESSFUL.")
-			return nil
-		} else if requestStatus == sdk.Failed {
+		reqestStatusView, _ := vraClient.GetRequestStatus(requestID)
+		status := reqestStatusView.Phase
+		d.Set(utils.RequestStatus, status)
+		log.Info("Checking to see the status of the request. Status: %s.", requestStatus)
+		if status == sdk.Successful {
+			log.Info("Request is SUCCESSFUL.")
+			return sdk.Successful, nil
+		} else if status == sdk.Failed {
 			log.Error("Request Failed with message %v ", d.Get(utils.FailedMessage))
-			//If request is failed during the time then
-			//unset resource details from state.
-			d.SetId("")
-			return fmt.Errorf("Request failed \n %v ", d.Get(utils.FailedMessage))
+			return sdk.Failed, fmt.Errorf("Request failed \n %v ", d.Get(utils.FailedMessage))
 		} else if requestStatus == sdk.InProgress {
-			log.Info("Resource creation is still IN PROGRESS.")
+			log.Info("The request is still IN PROGRESS. Please try again later. \nRun terraform refresh to get the latest state of your request")
+			return sdk.InProgress, nil
 		} else {
-			log.Info("Resource creation request status: %s.", requestStatus)
+			log.Info("Request status: %s.", requestStatus)
 		}
 	}
-
 	// The execution has timed out while still IN PROGRESS.
 	// The user will need to use 'terraform refresh' at a later point to resolve this.
-	return fmt.Errorf("Resource creation has timed out")
+	return "", fmt.Errorf("Request has timed out. Please try again later. \nRun terraform refresh to get the latest state of your request")
 }
 
 // read the config file
