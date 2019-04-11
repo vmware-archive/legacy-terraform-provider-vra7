@@ -41,6 +41,82 @@ type ProviderSchema struct {
 	ResourceConfiguration   map[string]interface{}
 }
 
+func resourceVra7Deployment() *schema.Resource {
+	return &schema.Resource{
+		Create: resourceVra7DeploymentCreate,
+		Read:   resourceVra7DeploymentRead,
+		Update: resourceVra7DeploymentUpdate,
+		Delete: resourceVra7DeploymentDelete,
+
+		Schema: map[string]*schema.Schema{
+			utils.CatalogItemName: {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			utils.CatalogItemID: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			utils.Description: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			utils.Reasons: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			utils.BusinessGroupID: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			utils.BusinessGroupName: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			utils.WaitTimeout: {
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  15,
+			},
+			utils.RequestStatus: {
+				Type:     schema.TypeString,
+				Computed: true,
+				ForceNew: true,
+			},
+			utils.FailedMessage: {
+				Type:     schema.TypeString,
+				Computed: true,
+				ForceNew: true,
+				Optional: true,
+			},
+			utils.DeploymentConfiguration: {
+				Type:     schema.TypeMap,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type:     schema.TypeMap,
+					Optional: true,
+					Elem:     schema.TypeString,
+				},
+			},
+			utils.ResourceConfiguration: {
+				Type:     schema.TypeMap,
+				Optional: true,
+				Computed: true,
+				Elem: &schema.Schema{
+					Type:     schema.TypeMap,
+					Optional: true,
+					Elem:     schema.TypeString,
+				},
+			},
+		},
+	}
+}
+
 // byLength type to sort component name list by it's name length
 type byLength []string
 
@@ -57,7 +133,7 @@ func (s byLength) Swap(i, j int) {
 // Terraform call - terraform apply
 // This function creates a new vRA 7 Deployment using configuration in a user's Terraform file.
 // The Deployment is produced by invoking a catalog item that is specified in the configuration.
-func createResource(d *schema.ResourceData, meta interface{}) error {
+func resourceVra7DeploymentCreate(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
 	// Get client handle
 	p := readProviderConfiguration(d)
@@ -130,7 +206,7 @@ func createResource(d *schema.ResourceData, meta interface{}) error {
 	if err != nil {
 		return err
 	}
-	return readResource(d, meta)
+	return resourceVra7DeploymentRead(d, meta)
 }
 
 func updateRequestTemplate(templateInterface map[string]interface{}, field string, value interface{}) map[string]interface{} {
@@ -146,7 +222,7 @@ func updateRequestTemplate(templateInterface map[string]interface{}, field strin
 // Terraform call - terraform apply
 // This function updates the state of a vRA 7 Deployment when changes to a Terraform file are applied.
 // The update is performed on the Deployment using supported (day-2) actions.
-func updateResource(d *schema.ResourceData, meta interface{}) error {
+func resourceVra7DeploymentUpdate(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
@@ -247,13 +323,13 @@ func updateResource(d *schema.ResourceData, meta interface{}) error {
 			}
 		}
 	}
-	return readResource(d, meta)
+	return resourceVra7DeploymentRead(d, meta)
 }
 
 // Terraform call - terraform refresh
 // This function retrieves the latest state of a vRA 7 deployment. Terraform updates its state based on
 // the information returned by this function.
-func readResource(d *schema.ResourceData, meta interface{}) error {
+func resourceVra7DeploymentRead(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
 	// Get the ID of the catalog request that was used to provision this Deployment.
 	catalogItemRequestID := d.Id()
@@ -306,7 +382,7 @@ func readResource(d *schema.ResourceData, meta interface{}) error {
 
 //Function use - To delete resources which are created by terraform and present in state file
 //Terraform call - terraform destroy
-func deleteResource(d *schema.ResourceData, meta interface{}) error {
+func resourceVra7DeploymentDelete(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
