@@ -31,7 +31,7 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockConfigResourceMap["mock.test.machine1.cpu"] = 2
 	mockConfigResourceMap["mock.test.machine1.mock.storage"] = 8
 
-	resourceSchema := resourceSchema()
+	resourceSchema := resourceVra7Deployment().Schema
 
 	resourceDataMap := map[string]interface{}{
 		utils.CatalogItemID:         "abcdefghijklmn",
