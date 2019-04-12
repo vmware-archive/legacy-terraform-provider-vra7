@@ -10,19 +10,6 @@ import (
 
 // terraform provider constants
 const (
-	CatalogItemName         = "catalog_item_name"
-	CatalogItemID           = "catalog_item_id"
-	Description             = "description"
-	Reasons                 = "reasons"
-	BusinessGroupID         = "businessgroup_id"
-	BusinessGroupName       = "businessgroup_name"
-	WaitTimeout             = "wait_timeout"
-	FailedMessage           = "failed_message"
-	DeploymentConfiguration = "deployment_configuration"
-	ResourceConfiguration   = "resource_configuration"
-	CatalogConfiguration    = "catalog_configuration"
-	RequestStatus           = "request_status"
-
 	// utility constants
 
 	LoggerID = "terraform-provider-vra7"
