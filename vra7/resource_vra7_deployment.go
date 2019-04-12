@@ -49,52 +49,52 @@ func resourceVra7Deployment() *schema.Resource {
 		Delete: resourceVra7DeploymentDelete,
 
 		Schema: map[string]*schema.Schema{
-			utils.CatalogItemName: {
+			"catalog_item_name": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			utils.CatalogItemID: {
-				Type:     schema.TypeString,
-				Computed: true,
-				Optional: true,
-			},
-			utils.Description: {
+			"catalog_item_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 				Optional: true,
 			},
-			utils.Reasons: {
+			"description": {
 				Type:     schema.TypeString,
 				Computed: true,
 				Optional: true,
 			},
-			utils.BusinessGroupID: {
+			"reasons": {
 				Type:     schema.TypeString,
 				Computed: true,
 				Optional: true,
 			},
-			utils.BusinessGroupName: {
+			"businessgroup_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 				Optional: true,
 			},
-			utils.WaitTimeout: {
+			"businessgroup_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
+			},
+			"wait_timeout": {
 				Type:     schema.TypeInt,
 				Optional: true,
 				Default:  15,
 			},
-			utils.RequestStatus: {
+			"request_status": {
 				Type:     schema.TypeString,
 				Computed: true,
 				ForceNew: true,
 			},
-			utils.FailedMessage: {
+			"failed_message": {
 				Type:     schema.TypeString,
 				Computed: true,
 				ForceNew: true,
 				Optional: true,
 			},
-			utils.DeploymentConfiguration: {
+			"deployment_configuration": {
 				Type:     schema.TypeMap,
 				Optional: true,
 				Elem: &schema.Schema{
@@ -103,7 +103,7 @@ func resourceVra7Deployment() *schema.Resource {
 					Elem:     schema.TypeString,
 				},
 			},
-			utils.ResourceConfiguration: {
+			"resource_configuration": {
 				Type:     schema.TypeMap,
 				Optional: true,
 				Computed: true,
@@ -245,7 +245,7 @@ func resourceVra7DeploymentUpdate(d *schema.ResourceData, meta interface{}) erro
 	}
 
 	// If any change made in resource_configuration.
-	if d.HasChange(utils.ResourceConfiguration) {
+	if d.HasChange("resource_configuration") {
 		for _, resources := range resourceActions.Content {
 			if resources.ResourceTypeRef.ID == sdk.InfrastructureVirtual {
 				var reconfigureEnabled bool
@@ -300,20 +300,29 @@ func resourceVra7DeploymentUpdate(d *schema.ResourceData, meta interface{}) erro
 								}
 							}
 						}
-						oldData, _ := d.GetChange(utils.ResourceConfiguration)
+						oldData, _ := d.GetChange("resource_configuration")
 						// If template value got changed then set post call and update resource child
 						if configChanged != false {
-							requestURL, err := vraClient.PostResourceAction(resources.ID, reconfigureActionID, resourceActionTemplate)
+							// This request id is for the reconfigure action on this machine and
+							// will be used to track the status of the reconfigure request for this resource.
+							// It will not replace the initial catalog item request id
+							requestID, err := vraClient.PostResourceAction(resources.ID, reconfigureActionID, resourceActionTemplate)
 							if err != nil {
-								d.Set(utils.ResourceConfiguration, oldData)
+								err = d.Set("resource_configuration", oldData)
+								if err != nil {
+									return err
+								}
 								log.Errorf("The update request failed with error: %v ", err)
 								return err
 							}
-							status, err := waitForRequestCompletion(d, meta, requestURL)
+							status, err := waitForRequestCompletion(d, meta, requestID)
 							if err != nil {
 								// if the update request fails, go back to the old state and return the error
 								if status == sdk.Failed {
-									d.Set(utils.ResourceConfiguration, oldData)
+									err = d.Set("resource_configuration", oldData)
+									if err != nil {
+										return err
+									}
 								}
 								return err
 							}
@@ -331,7 +340,8 @@ func resourceVra7DeploymentUpdate(d *schema.ResourceData, meta interface{}) erro
 // the information returned by this function.
 func resourceVra7DeploymentRead(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
-	// Get the ID of the catalog request that was used to provision this Deployment.
+	// Get the ID of the catalog request that was used to provision this Deployment. This id
+	// will remain the same for this deployment across any actions on the machines like reconfigure, etc.
 	catalogItemRequestID := d.Id()
 
 	requestResourceView, errTemplate := vraClient.GetRequestResourceView(catalogItemRequestID)
@@ -366,13 +376,13 @@ func resourceVra7DeploymentRead(d *schema.ResourceData, meta interface{}) error 
 			dataVals[sdk.MachineDestructionDate] = resourceData.MachineDestructionDate
 		}
 	}
-	resourceConfiguration, _ := d.Get(utils.ResourceConfiguration).(map[string]interface{})
+	resourceConfiguration, _ := d.Get("resource_configuration").(map[string]interface{})
 	changed := false
 
 	resourceConfiguration, changed = utils.UpdateResourceConfigurationMap(resourceConfiguration, resourceDataMap)
 
 	if changed {
-		setError := d.Set(utils.ResourceConfiguration, resourceConfiguration)
+		setError := d.Set("resource_configuration", resourceConfiguration)
 		if setError != nil {
 			return fmt.Errorf(setError.Error())
 		}
@@ -429,12 +439,12 @@ func resourceVra7DeploymentDelete(d *schema.ResourceData, meta interface{}) erro
 				log.Errorf(DestroyActionTemplateError, deploymentName, err.Error())
 				return fmt.Errorf(DestroyActionTemplateError, deploymentName, err.Error())
 			}
-			requestURL, err := vraClient.PostResourceAction(resources.ID, destroyActionID, resourceActionTemplate)
+			requestID, err := vraClient.PostResourceAction(resources.ID, destroyActionID, resourceActionTemplate)
 			if err != nil {
 				log.Errorf("The destroy deployment request failed with error: %v ", err)
 				return err
 			}
-			status, err := waitForRequestCompletion(d, meta, requestURL)
+			status, err := waitForRequestCompletion(d, meta, requestID)
 			if err != nil {
 				if status == sdk.Successful {
 					d.SetId("")
@@ -521,15 +531,15 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 		log.Error(CatalogItemIDNameNotMatchingErr, p.CatalogItemName, p.CatalogItemID)
 		return nil, fmt.Errorf(CatalogItemIDNameNotMatchingErr, p.CatalogItemName, p.CatalogItemID)
 	} else if len(p.CatalogItemID) > 0 { // else if both are provided and matches or just id is provided, use id
-		d.Set(utils.CatalogItemID, p.CatalogItemID)
-		d.Set(utils.CatalogItemName, catalogItemNameFromID)
+		d.Set("catalog_item_id", p.CatalogItemID)
+		d.Set("catalog_item_name", catalogItemNameFromID)
 	} else if len(p.CatalogItemName) > 0 { // else if name is provided, use the id fetched from the name
-		d.Set(utils.CatalogItemID, catalogItemIDFromName)
-		d.Set(utils.CatalogItemName, p.CatalogItemName)
+		d.Set("catalog_item_id", catalogItemIDFromName)
+		d.Set("catalog_item_name", p.CatalogItemName)
 	}
 
 	// update the catalogItemID var with the updated id
-	p.CatalogItemID = d.Get(utils.CatalogItemID).(string)
+	p.CatalogItemID = d.Get("catalog_item_id").(string)
 
 	// Get request template for catalog item.
 	requestTemplate, err := vraClient.GetCatalogItemRequestTemplate(p.CatalogItemID)
@@ -568,7 +578,7 @@ func (p *ProviderSchema) checkConfigValuesValidity(d *schema.ResourceData) (*sdk
 // check the request status on apply and update
 func waitForRequestCompletion(d *schema.ResourceData, meta interface{}, requestID string) (string, error) {
 
-	waitTimeout := d.Get(utils.WaitTimeout).(int) * 60
+	waitTimeout := d.Get("wait_timeout").(int) * 60
 	sleepFor := 30
 	requestStatus := ""
 	for i := 0; i < waitTimeout/sleepFor; i++ {
@@ -577,14 +587,14 @@ func waitForRequestCompletion(d *schema.ResourceData, meta interface{}, requestI
 
 		reqestStatusView, _ := vraClient.GetRequestStatus(requestID)
 		status := reqestStatusView.Phase
-		d.Set(utils.RequestStatus, status)
+		d.Set("request_status", status)
 		log.Info("Checking to see the status of the request. Status: %s.", requestStatus)
 		if status == sdk.Successful {
 			log.Info("Request is SUCCESSFUL.")
 			return sdk.Successful, nil
 		} else if status == sdk.Failed {
-			log.Error("Request Failed with message %v ", d.Get(utils.FailedMessage))
-			return sdk.Failed, fmt.Errorf("Request failed \n %v ", d.Get(utils.FailedMessage))
+			log.Error("Request Failed with message %v ", d.Get("failed_message"))
+			return sdk.Failed, fmt.Errorf("Request failed \n %v ", d.Get("failed_message"))
 		} else if requestStatus == sdk.InProgress {
 			log.Info("The request is still IN PROGRESS. Please try again later. \nRun terraform refresh to get the latest state of your request")
 			return sdk.InProgress, nil
@@ -602,16 +612,16 @@ func readProviderConfiguration(d *schema.ResourceData) *ProviderSchema {
 
 	log.Info("Reading the provider configuration data.....")
 	providerSchema := ProviderSchema{
-		CatalogItemName:         strings.TrimSpace(d.Get(utils.CatalogItemName).(string)),
-		CatalogItemID:           strings.TrimSpace(d.Get(utils.CatalogItemID).(string)),
-		Description:             strings.TrimSpace(d.Get(utils.Description).(string)),
-		Reasons:                 strings.TrimSpace(d.Get(utils.Reasons).(string)),
-		BusinessGroupName:       strings.TrimSpace(d.Get(utils.BusinessGroupName).(string)),
-		BusinessGroupID:         strings.TrimSpace(d.Get(utils.BusinessGroupID).(string)),
-		WaitTimeout:             d.Get(utils.WaitTimeout).(int) * 60,
-		FailedMessage:           strings.TrimSpace(d.Get(utils.FailedMessage).(string)),
-		ResourceConfiguration:   d.Get(utils.ResourceConfiguration).(map[string]interface{}),
-		DeploymentConfiguration: d.Get(utils.DeploymentConfiguration).(map[string]interface{}),
+		CatalogItemName:         strings.TrimSpace(d.Get("catalog_item_name").(string)),
+		CatalogItemID:           strings.TrimSpace(d.Get("catalog_item_id").(string)),
+		Description:             strings.TrimSpace(d.Get("description").(string)),
+		Reasons:                 strings.TrimSpace(d.Get("reasons").(string)),
+		BusinessGroupName:       strings.TrimSpace(d.Get("businessgroup_name").(string)),
+		BusinessGroupID:         strings.TrimSpace(d.Get("businessgroup_id").(string)),
+		WaitTimeout:             d.Get("wait_timeout").(int) * 60,
+		FailedMessage:           strings.TrimSpace(d.Get("failed_message").(string)),
+		ResourceConfiguration:   d.Get("resource_configuration").(map[string]interface{}),
+		DeploymentConfiguration: d.Get("deployment_configuration").(map[string]interface{}),
 	}
 
 	log.Info("The values provided in the TF config file is: \n %v ", providerSchema)
