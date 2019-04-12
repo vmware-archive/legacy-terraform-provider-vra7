@@ -34,8 +34,8 @@ func TestConfigValidityFunction(t *testing.T) {
 	resourceSchema := resourceVra7Deployment().Schema
 
 	resourceDataMap := map[string]interface{}{
-		utils.CatalogItemID:         "abcdefghijklmn",
-		utils.ResourceConfiguration: mockConfigResourceMap,
+		"catalog_item_id":        "abcdefghijklmn",
+		"resource_configuration": mockConfigResourceMap,
 	}
 
 	mockResourceData := schema.TestResourceDataRaw(t, resourceSchema, resourceDataMap)
@@ -50,8 +50,8 @@ func TestConfigValidityFunction(t *testing.T) {
 	mockConfigResourceMap["machine2.storage"] = 2
 
 	resourceDataMap = map[string]interface{}{
-		utils.CatalogItemID:         "abcdefghijklmn",
-		utils.ResourceConfiguration: mockConfigResourceMap,
+		"catalog_item_id":        "abcdefghijklmn",
+		"resource_configuration": mockConfigResourceMap,
 	}
 
 	mockResourceData = schema.TestResourceDataRaw(t, resourceSchema, resourceDataMap)
@@ -62,8 +62,8 @@ func TestConfigValidityFunction(t *testing.T) {
 
 	mockConfigResourceMap["mock.machine3.vSphere.mock.cpu"] = 2
 	resourceDataMap = map[string]interface{}{
-		utils.CatalogItemID:         "abcdefghijklmn",
-		utils.ResourceConfiguration: mockConfigResourceMap,
+		"catalog_item_id":        "abcdefghijklmn",
+		"resource_configuration": mockConfigResourceMap,
 	}
 
 	mockResourceData = schema.TestResourceDataRaw(t, resourceSchema, resourceDataMap)
