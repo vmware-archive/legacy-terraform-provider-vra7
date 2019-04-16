@@ -89,10 +89,48 @@ func GetMockRequestTemplate() *sdk.CatalogItemRequestTemplate {
 	return &mockRequestTemplateStruct
 
 }
-func TestAccVra7Deployment_basic(t *testing.T) {
+
+func TestAccVra7DeploymentCreate_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckVra7DeploymentDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccCheckVra7DeploymentConfig(),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckVra7DeploymentExists("vra7_deployment.my_vra7_deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "description", "Test deployment"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "reasons", "Testing the vRA 7 Terraform plugin"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "businessgroup_name", "Development"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.%", "2"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration._leaseDays", "15"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "deployment_configuration.deployment_property", "custom deployment property"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.%", "3"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.cpu", "1"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.memory", "2048"),
+					resource.TestCheckResourceAttr(
+						"vra7_deployment.my_vra7_deployment", "resource_configuration.vSphereVM1.machine_property", "machine custom property"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccVra7DeploymentUpdate_basic(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		Providers:    testAccProviders,
+		CheckDestroy: testAccCheckVra7DeploymentDestroy,
 		Steps: []resource.TestStep{
 			{
 				Config: testAccCheckVra7DeploymentConfig(),
@@ -163,6 +201,20 @@ func testAccCheckVra7DeploymentExists(n string) resource.TestCheckFunc {
 
 		return nil
 	}
+}
+
+func testAccCheckVra7DeploymentDestroy(s *terraform.State) error {
+	for _, rs := range s.RootModule().Resources {
+		if rs.Type != "vra7_deployment" {
+			continue
+		}
+
+		_, err := client.GetRequestResourceView(rs.Primary.ID)
+		if err == nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func testAccCheckVra7DeploymentUpdateConfig() string {
