@@ -1,0 +1,91 @@
+id: BasicSingleMachine
+name: Basic Single Machine
+description: Basic vSphere Machine
+status: PUBLISHED
+properties:
+  _archiveDays: 7
+  _leaseDays:
+    default: 1
+    max: 60
+    min: 1
+  _number_of_instances:
+    max: 4
+  _snapshot_propagation: true
+  deployment_property:
+    default: ''
+    required: true
+    secured: false
+    visible: true
+components:
+  DefaultNetworkProfile:
+    type: Infrastructure.Network.Network.Existing
+    data:
+      name:
+        fixed: DefaultNetworkProfile
+      network_profile:
+        fixed: Default Network Profile
+  vSphereVM1:
+    type: Infrastructure.CatalogItem.Machine.Virtual.vSphere
+    data:
+      _cluster:
+        default: 1
+        max: 4
+        min: 1
+      action:
+        fixed: FullClone
+      allow_storage_policies:
+        fixed: false
+      blueprint_type:
+        fixed: '1'
+      cpu:
+        default: 1
+        max: 4
+        min: 1
+      disks:
+      - capacity: 1
+        custom_properties: null
+        id: 1553546029135
+        initial_location: ''
+        is_clone: true
+        label: Hard disk 1
+        storage_reservation_policy: ''
+        userCreated: false
+        volumeId: 0
+      guest_customization_specification: Linux
+      machine_property:
+        default: ''
+        required: true
+        secured: false
+        visible: true
+      max_network_adapters: {}
+      max_volumes: {}
+      memory:
+        default: 1240
+        max: 8192
+        min: 1240
+      nics:
+      - address: ''
+        assignment_type: Static
+        id: 0
+        load_balancing: ''
+        network: ${_resource~DefaultNetworkProfile}
+        network_profile: Default Network Profile
+      provisioning_workflow:
+        fixed:
+          id: CloneWorkflow
+          label: CloneWorkflow
+      security_groups: []
+      security_tags: []
+      source_machine:
+        fixed:
+          id: f894c16e-1400-478b-8b27-ccf26d055a17
+          label: WebTinyCentOS65x86
+      source_machine_name:
+        fixed: WebTinyCentOS65x86
+      storage:
+        default: 1
+        max: 8
+        min: 1
+layout:
+  DefaultNetworkProfile: 1,0
+  vSphereVM1: 0,1
