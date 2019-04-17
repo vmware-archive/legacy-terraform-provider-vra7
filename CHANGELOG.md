@@ -1,4 +1,4 @@
-# [](https://github.com/vmware/terraform-provider-vra7/compare/v0.1.0...v) (2019-04-16)
+## 0.2.0 (Unreleased)
 
 FEATURES:
 
@@ -14,7 +14,7 @@ BUG FIXES:
 * Acceptance tests for vra7_deployment resource and fix for issue # 143 ([#144](https://github.com/vmware/terraform-provider-vra7/pull/144))
 
 
-# [0.1.0](https://github.com/vmware/terraform-provider-vra7/compare/v0.0.2...v0.1.0) (2019-04-01)
+## 0.1.0 (April 1, 2019)
 
 FEATURES:
 
@@ -25,7 +25,7 @@ IMPROVEMENTS:
 BUG FIXES:
 
 
-## [0.0.2](https://github.com/vmware/terraform-provider-vra7/compare/v0.0.1...v0.0.2) (2019-03-26)
+## 0.0.2 (March 26, 2019)
 
 FEATURES:
 
@@ -40,7 +40,7 @@ BUG FIXES:
 * Handle response pagination when fetching catalog item id by name ([#134](https://github.com/vmware/terraform-provider-vra7/pull/134))
 
 
-## 0.0.1 (2019-02-08)
+## 0.0.1 (February 7, 2019)
 
 FEATURES:
 
