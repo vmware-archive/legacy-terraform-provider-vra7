@@ -220,4 +220,4 @@ Note: This script will only convert the state file. The changes to the config fi
 The `terraform-provider-vra7` project team welcomes contributions from the community. Before you start working with `terraform-provider-vra7`, please read our [Developer Certificate of Origin](https://cla.vmware.com/dco). All contributions to this repository must be signed as described on that page. Your signature certifies that you wrote the patch or have the right to pass it on as an open-source patch. For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
 
 # License
-`terraform-provider-vra7` is available under the [MIT license](LICENSE).
+`terraform-provider-vra7` is available under the [Mozilla Public License, version 2.0 license](LICENSE).
