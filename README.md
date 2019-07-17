@@ -1,3 +1,8 @@
+This project has moved to the terraform-providers organization and is archived.
+
+The new location is here:
+https://github.com/terraform-providers/terraform-provider-vra7
+
 VMware Terraform provider for vRealize Automation 7
 ===
 [![Build Status](https://travis-ci.org/vmware/terraform-provider-vra7.svg?branch=master)](https://travis-ci.org/vmware/terraform-provider-vra7)
