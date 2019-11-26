@@ -1,5 +1,6 @@
 package vra7
 
+
 import (
 	"fmt"
 	"reflect"
@@ -39,6 +40,7 @@ type ProviderSchema struct {
 	FailedMessage           string
 	DeploymentConfiguration map[string]interface{}
 	ResourceConfiguration   map[string]interface{}
+	esc                     bool
 }
 
 func resourceVra7Deployment() *schema.Resource {
@@ -48,7 +50,7 @@ func resourceVra7Deployment() *schema.Resource {
 		Update: resourceVra7DeploymentUpdate,
 		Delete: resourceVra7DeploymentDelete,
 
-		Schema: map[string]*schema.Schema{
+		Schema: map[string]*schema.Schema{	
 			"catalog_item_name": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -113,6 +115,10 @@ func resourceVra7Deployment() *schema.Resource {
 					Elem:     schema.TypeString,
 				},
 			},
+  		"esc": {
+  			Type:     schema.TypeBool,
+  			Optional: true,
+  		},					
 		},
 	}
 }
@@ -394,6 +400,8 @@ func resourceVra7DeploymentRead(d *schema.ResourceData, meta interface{}) error 
 //Terraform call - terraform destroy
 func resourceVra7DeploymentDelete(d *schema.ResourceData, meta interface{}) error {
 	vraClient = meta.(*sdk.APIClient)
+	// Get client handle
+	p := readProviderConfiguration(d)
 	//Get requester machine ID from schema.dataresource
 	catalogItemRequestID := d.Id()
 	// Throw an error if request ID has no value or empty value
@@ -423,11 +431,11 @@ func resourceVra7DeploymentDelete(d *schema.ResourceData, meta interface{}) erro
 			var destroyEnabled bool
 			var destroyActionID string
 			for _, op := range resources.Operations {
-				if op.Name == sdk.Destroy {
-					destroyEnabled = true
-					destroyActionID = op.OperationID
-					break
-				}
+				if (p.esc && op.Name == sdk.DeploymentDestroy) || (!p.esc && op.Name == sdk.Destroy) {
+						destroyEnabled = true
+					  destroyActionID = op.OperationID
+					  break						  
+				} 
 			}
 			// if destroy deployment action is not available for the deployment
 			// return with an error message
@@ -454,6 +462,7 @@ func resourceVra7DeploymentDelete(d *schema.ResourceData, meta interface{}) erro
 	}
 	return nil
 }
+
 
 // check if the resource configuration is valid in the terraform config file
 func (p *ProviderSchema) checkResourceConfigValidity(requestTemplate *sdk.CatalogItemRequestTemplate) error {
@@ -622,6 +631,7 @@ func readProviderConfiguration(d *schema.ResourceData) *ProviderSchema {
 		FailedMessage:           strings.TrimSpace(d.Get("failed_message").(string)),
 		ResourceConfiguration:   d.Get("resource_configuration").(map[string]interface{}),
 		DeploymentConfiguration: d.Get("deployment_configuration").(map[string]interface{}),
+		esc:                     d.Get("esc").(bool),
 	}
 
 	log.Info("The values provided in the TF config file is: \n %v ", providerSchema)

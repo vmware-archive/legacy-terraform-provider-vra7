@@ -54,7 +54,7 @@ func providerSchema() map[string]*schema.Schema {
 			DefaultFunc: schema.EnvDefaultFunc("VRA7_INSECURE", nil),
 			Optional:    true,
 			Description: "Specify whether to validate TLS certificates.",
-		},
+		},	
 	}
 }
 
