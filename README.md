@@ -185,6 +185,23 @@ resource "vra7_deployment" "example_machine2" {
 
 ```
 
+For Swisscom Enterprise Cloud you can set esc = true to trigger advanced functions:
+
+```yaml
+resource "vra7_deployment" "example_machine1" {
+  esc = true
+  catalog_item_name = "CentOS"
+  reasons      = "I have some"
+  description  = "deployment via terraform"
+   resource_configuration = {
+     }
+     deployment_configuration = {
+         _leaseDays = "5"
+     }
+     count = 1
+}
+```
+
 Save this configuration in `main.tf` in a path where the binary is placed.
 
 ## Execution
